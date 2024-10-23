@@ -1,7 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
-import 'auth_button.dart'; // Assuming this is the button file you'll create
+import 'auth_button.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -17,6 +17,7 @@ class _SignUpFormState extends State<SignUpForm> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  bool _agreedToTerms = false; // Track if checkbox is checked
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +37,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Username',
@@ -64,7 +65,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Email',
@@ -94,7 +95,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Password',
@@ -123,7 +124,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Confirm Password',
@@ -139,15 +140,53 @@ class _SignUpFormState extends State<SignUpForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 2),
 
-            // Sign Up Button
+            // Checkbox for agreeing to Terms
+            Row(
+              children: [
+                Checkbox(
+                  value: _agreedToTerms,
+                  onChanged: (value) {
+                    setState(() {
+                      _agreedToTerms = value ?? false;
+                    });
+                  },
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      // Handle navigation to Terms of Use page
+                      Navigator.pushNamed(context, '/terms');
+                    },
+                    child: const Text(
+                      'I agree to the Terms of Use',
+                      style: TextStyle(
+                        color: Colors.blueAccent, // Theme color
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+
+            // Sign Up Button (disabled until checkbox is checked)
             AuthButton(
               text: 'Sign Up',
               color: Colors.purple,
               onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Handle sign up logic here
+                if (!_agreedToTerms) {
+                  // Show a message if the user has not agreed to the terms
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'You need to agree to the Terms of Use to proceed.'),
+                    ),
+                  );
+                } else if (_formKey.currentState!.validate()) {
+                  // Handle sign up logic
+                  Navigator.pushNamed(context, '/verification');
                 }
               },
             ),

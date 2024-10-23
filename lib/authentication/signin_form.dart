@@ -81,7 +81,19 @@ class _SignInFormState extends State<SignInForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 40),
+            TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/forgotpassword');
+                },
+                child: const Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14,
+                      fontFamily: 'Kavivanar',
+                      fontWeight: FontWeight.w400),
+                )),
+            const SizedBox(height: 10),
 
             // Sign In Button
             AuthButton(
