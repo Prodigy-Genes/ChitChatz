@@ -7,7 +7,7 @@ class Home extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Colors.white,
-      body: Text('Home'),
+      body: Center(child: Text('Home'),) ,
     );
   }
 }

@@ -1,5 +1,7 @@
-// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously, avoid_print
 
+import 'package:email_auth/email_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'auth_button.dart';
 
@@ -175,7 +177,7 @@ class _SignUpFormState extends State<SignUpForm> {
             AuthButton(
               text: 'Sign Up',
               color: Colors.purple,
-              onPressed: () {
+              onPressed: () async {
                 if (!_agreedToTerms) {
                   // Show a message if the user has not agreed to the terms
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +188,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   );
                 } else if (_formKey.currentState!.validate()) {
                   // Handle sign up logic
-                  Navigator.pushNamed(context, '/verification');
+                  _signup();
                 }
               },
             ),
@@ -194,5 +196,105 @@ class _SignUpFormState extends State<SignUpForm> {
         ),
       ),
     );
+  }
+
+  Future<void> _signup() async {
+    try {
+      // Handle sign up logic
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+
+      // Get the current user
+      User? user = userCredential.user; // Get the signed-in user from userCredential
+
+      if (user != null) {
+        // Send OTP to email using EmailAuth
+        bool otpSent = await sendOtp(user.email!); // Ensure user.email is not null
+        if (!otpSent) {
+          throw Exception('Failed to send OTP to ${user.email}');
+        }
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('OTP sent! Please check your inbox.'),
+              backgroundColor: Colors.green, // Success color
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(10.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+            ),
+          );
+
+          // Navigate to verification page after successful sign up
+          Navigator.pushNamed(
+            context,
+            '/verification',
+            arguments: user, // Pass the user object to the next screen
+          );
+        }
+      } else {
+        print('User is null');
+      }
+    } on FirebaseAuthException catch (e) {
+      // Handle specific Firebase sign up errors
+      String errorMessage;
+      switch (e.code) {
+        case 'invalid-email':
+          errorMessage = 'Invalid email format.';
+          break;
+        case 'weak-password':
+          errorMessage = 'Password should be at least 6 characters long.';
+          break;
+        case 'email-already-in-use':
+          errorMessage = 'This email is already registered.';
+          break;
+        case 'network-request-failed':
+          errorMessage = 'Network issue. Please check your connection.';
+          break;
+        default:
+          errorMessage = 'An unexpected error occurred: ${e.message}';
+      }
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.orange, // Warning theme color
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(10.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle any other errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign up failed: $e'),
+            backgroundColor: Colors.red, // Error color
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(10.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> sendOtp(String email) async {
+    EmailAuth emailAuth = EmailAuth(sessionName: 'Verify Email');
+    var result = await emailAuth.sendOtp(recipientMail: email);
+    return result; 
   }
 }
