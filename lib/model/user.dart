@@ -31,4 +31,14 @@ class UserModel {
       'createdAt': createdAt,
     };
   }
+
+  // Method to create a UserModel from a Map
+  factory UserModel.fromMap(String uid, Map<String, dynamic> map) {
+    return UserModel(
+      uid: uid,
+      username: map['username'] ?? '',
+      email: map['email'] ?? '',
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+    );
+  }
 }

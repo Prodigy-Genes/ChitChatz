@@ -1,6 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'package:chatapp/authentication/validate_otp_button.dart';
+import 'package:chatapp/authentication/auth_button.dart';
 import 'package:chatapp/model/user.dart';
 import 'package:chatapp/screens/home.dart';
 import 'package:email_auth/email_auth.dart';
@@ -10,9 +10,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logger/logger.dart';
 
 class Verification extends StatefulWidget {
-  final User? user;
+  final String userId; // Pass userId instead of User object
 
-  const Verification({super.key, this.user});
+  const Verification({super.key, required this.userId}); // Update constructor
 
   @override
   State<Verification> createState() => _VerificationState();
@@ -22,11 +22,13 @@ class _VerificationState extends State<Verification> {
   final Logger _logger = Logger();
   final TextEditingController _otpController = TextEditingController();
   bool isEmailVerified = true;
+  Future<bool>? _otpValidationFuture;
+  UserModel? currentUser; // To hold the current user details
 
   @override
   void initState() {
     super.initState();
-    checkEmailVerified();
+    _fetchUserData(); // Fetch user data based on userId
   }
 
   @override
@@ -35,66 +37,136 @@ class _VerificationState extends State<Verification> {
     super.dispose();
   }
 
-  Future<void> checkEmailVerified() async {
-    await widget.user?.reload();
-    bool verified = widget.user?.emailVerified ?? false;
-
-    if (verified) {
-      await _saveUserToFirestore();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const Home()), // Navigate to Home
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please verify your email to proceed.')),
-      );
-    }
-  }
-
-  Future<void> _saveUserToFirestore() async {
-    if (widget.user != null) {
-      UserModel newUser = UserModel(
-        uid: widget.user!.uid,
-        username: widget.user!.displayName ?? 'No Username',
-        email: widget.user!.email ?? '',
-        createdAt: DateTime.now(),
-      );
-
-      await FirebaseFirestore.instance
+  // Function to fetch user data from Firestore using userId
+  Future<void> _fetchUserData() async {
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(widget.user!.uid)
-          .set(newUser.toMap());
+          .doc(widget.userId) // Use userId
+          .get();
 
+      if (userDoc.exists) {
+        currentUser = UserModel.fromMap(widget.userId, userDoc.data() as Map<String, dynamic>);
+        checkEmailVerified(); // Check email verification after fetching user
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User data not found.')),
+        );
+      }
+    } catch (e) {
+      _logger.e('Failed to fetch user data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User details saved to Firestore')),
+        SnackBar(content: Text('Error fetching user data: ${e.toString()}')),
       );
     }
   }
 
-  Future<void> validateOtp(String otp) async {
+  void checkEmailVerified() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      isEmailVerified = user.emailVerified; // Check email verification status
+      if (isEmailVerified) {
+        _logger.i('User email verified');
+      } else {
+        _logger.w('User email not verified');
+      }
+    }
+  }
+
+  void verifyOtp() async {
+  if (_otpController.text.isNotEmpty) {
+    setState(() {
+      // Optionally show loading state if needed
+    });
+
+    // Call validateOtp function
+    bool isVerified = await validateOtp(_otpController.text);
+
+    if (isVerified) {
+      // If OTP is valid, navigate to home screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const Home()),
+      );
+    }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please enter OTP.')),
+    );
+  }
+}
+
+Future<bool> validateOtp(String otp) async {
   EmailAuth emailAuth = EmailAuth(sessionName: 'Verify Email');
-  
+
+  // Retrieve the email using userId
+  String email = await _getEmailByUserId(widget.userId); 
+
   bool isValid = emailAuth.validateOtp(
-    recipientMail: widget.user?.email ?? '',
+    recipientMail: email,
     userOtp: otp,
   );
 
   if (isValid) {
     _logger.i('OTP validated successfully.');
-    // Mark the email as verified
-    await _saveUserToFirestore();
-    
-    // Navigate to Home after successful validation
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const Home()),
-    );
+    await _saveUserToFirestore(widget.userId);  // Save user details to Firestore
+    return true;
   } else {
     _logger.e('Invalid OTP entered.');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Invalid OTP. Please try again.')),
     );
+    return false;
   }
 }
+
+Future<void> _saveUserToFirestore(String userId) async {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser != null) {
+    UserModel newUser = UserModel(
+      uid: userId,
+      username: currentUser.displayName ?? 'New User', // Assuming you want to use the display name from Firebase
+      email: currentUser.email ?? '', // Use email from FirebaseAuth
+      createdAt: DateTime.now(),
+    );
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .set(newUser.toMap());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User details saved to Firestore')),
+      );
+    } catch (e) {
+      _logger.e('Failed to save user to Firestore: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving user: ${e.toString()}')),
+      );
+    }
+  }
+}
+
+// This method retrieves the user's email from Firestore
+Future<String> _getEmailByUserId(String userId) async {
+  try {
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .get();
+
+    if (userDoc.exists) {
+      UserModel user = UserModel.fromDocumentSnapshot(userDoc.data() as Map<String, dynamic>, userId);
+      return user.email; // Retrieve email from UserModel
+    } else {
+      throw Exception('User not found');
+    }
+  } catch (e) {
+    _logger.e('Failed to retrieve email: $e');
+    return '';
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +175,12 @@ class _VerificationState extends State<Verification> {
       appBar: AppBar(
         title: const Text('Account Verification'),
         backgroundColor: const Color.fromARGB(255, 110, 39, 176),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back), // Add back arrow
+          onPressed: () {
+            Navigator.of(context).pop(); // Go back to the previous screen
+          },
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -136,11 +214,28 @@ class _VerificationState extends State<Verification> {
             const SizedBox(height: 20),
 
             // Validate OTP button
-            ValidateOtpButton(
-              onValidateOtp: () {
+            AuthButton(
+              text: 'Verify OTP',
+              color: const Color.fromARGB(255, 110, 39, 176), // Use your desired button color
+              onPressed: () {
                 validateOtp(_otpController.text);
               },
             ),
+
+            // FutureBuilder to manage OTP validation status
+            if (_otpValidationFuture != null)
+              FutureBuilder<bool>(
+                future: _otpValidationFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  } else if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}');
+                  } else {
+                    return const SizedBox.shrink(); // No additional UI needed
+                  }
+                },
+              ),
           ],
         ),
       ),
