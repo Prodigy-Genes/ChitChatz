@@ -43,7 +43,5 @@ app.*.map.json
 /android/app/release
 # Flutter/Dart
 assets/.env
-lib/main.dart
-lib/authentication/auth.dart
 android/app/google-services.json
 

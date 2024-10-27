@@ -19,12 +19,10 @@ class _AuthRouteState extends State<AuthRoute> {
   bool isLoading = true;
   bool isEmailVerified = false;
   bool hasValidUserData = false;
-  
 
   @override
   void initState() {
     super.initState();
-    _navigateToSignup(); // Start by navigating to Signup on app start or hot reload
     
     // Subscribe to auth state changes
     Auth().authStateChanges.listen((User? currentUser) {
@@ -33,9 +31,6 @@ class _AuthRouteState extends State<AuthRoute> {
         _checkEmailAndUserData();
       } else {
         // If no user is authenticated, navigate to Signup
-        setState(() {
-          isLoading = false;
-        });
         _navigateToSignup();
       }
     });
@@ -43,12 +38,15 @@ class _AuthRouteState extends State<AuthRoute> {
 
   // Navigate to Signup screen
   void _navigateToSignup() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) {
+      setState(() {
+        isLoading = false; // Stop loading indicator
+      });
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const Signup()),
       );
-    });
+    }
   }
 
   Future<void> _checkEmailAndUserData() async {
@@ -58,18 +56,13 @@ class _AuthRouteState extends State<AuthRoute> {
       User? refreshedUser = FirebaseAuth.instance.currentUser;
 
       if (refreshedUser != null) {
-        setState(() {
-          isEmailVerified = refreshedUser.emailVerified;
-        });
+        // Update email verified status
+        isEmailVerified = refreshedUser.emailVerified;
 
+        // Only check user data if email is verified
         if (isEmailVerified) {
-          // Only check user data if email is verified
           hasValidUserData = await Auth().isUserDataValid(refreshedUser.uid);
         }
-
-        setState(() {
-          isLoading = false;
-        });
 
         // Navigate based on the email and data checks
         if (isEmailVerified) {
@@ -79,22 +72,22 @@ class _AuthRouteState extends State<AuthRoute> {
             _navigateToSignup(); // Go to Signup if user data is not valid
           }
         } else {
-          _navigateToVerification(); // Go to Verification if email is not verified
+          _navigateToVerification(refreshedUser.email); // Pass the email to Verification
         }
       }
     } catch (e) {
       // Handle specific FirebaseAuth exceptions such as user not found
       if (e is FirebaseAuthException && e.code == 'user-not-found') {
-        // Navigate to Signup if the user is not found
-        _navigateToSignup();
+        _navigateToSignup(); // Navigate to Signup if the user is not found
       } else {
-        // Handle other errors if necessary (show an error message)
-        print('Error checking user data: $e');
+        print('Error checking user data: $e'); // Handle other errors if necessary
       }
-
-      setState(() {
-        isLoading = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false; // Stop loading indicator
+        });
+      }
     }
   }
 
@@ -105,18 +98,18 @@ class _AuthRouteState extends State<AuthRoute> {
     );
   }
 
-  void _navigateToVerification() {
-  if (user != null) { // Check if the user is not null
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => Verification(userId: user!.uid)), 
-    );
-  } else {
-    // Handle the case where user is null (optional)
-    print('User is not authenticated.');
+  // Modified to accept the email parameter
+  void _navigateToVerification(String? email) {
+    if (user != null && email != null && email.isNotEmpty) { // Check for null and empty email
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => Verification(userId: user!.uid, email: email)),
+      );
+    } else {
+      // Handle the case where user is null or email is null
+      print('User is not authenticated or email is null.');
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {

@@ -158,6 +158,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.2.1"
+  flutter_email_js:
+    dependency: "direct main"
+    description:
+      name: flutter_email_js
+      sha256: e55be59727b38e6ba0fef3c26f9904f1f6bb0ead519d8dcdd92f7cf861afb699
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3"
   flutter_lints:
     dependency: "direct dev"
     description:
