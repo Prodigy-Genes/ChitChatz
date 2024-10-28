@@ -29,48 +29,48 @@ class Auth {
   }
 
   Future<void> createWithEmailAndPassword({
-  required String username,
-  required String email,
-  required String password,
-  required BuildContext context, // Pass the context to navigate
-}) async {
-  try {
-    _logger.i('Attempting to sign up user with email: $email');
+    required String username,
+    required String email,
+    required String password,
+    required BuildContext context, // Pass the context to navigate
+  }) async {
+    try {
+      _logger.i('Attempting to sign up user with email: $email');
 
-    // Check if email or password is null or empty
-    if (email.isEmpty || password.isEmpty) {
-      throw Exception('Email and password cannot be empty.');
+      // Check if email or password is null or empty
+      if (email.isEmpty || password.isEmpty) {
+        throw Exception('Email and password cannot be empty.');
+      }
+
+      // Create user with Firebase Authentication
+      UserCredential userCredential = await _firebaseAuth
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      _logger.i('User created with UID: ${userCredential.user!.uid}');
+
+      // Request OTP
+      await requestOtp(userCredential.user!.uid); // Use userId
+
+      // Navigate to the verification screen with the user ID and email
+      String userId = userCredential.user!.uid; // Use userId instead of user
+      _logger.i('Navigating to Verification with email: $email');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) =>
+              Verification(userId: userId, email: email), // Pass email
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      _handleFirebaseAuthErrors(e);
+    } on FirebaseException catch (e) {
+      _logger.e(
+          'FirebaseException occurred when saving user to Firestore: ${e.code}: ${e.message}');
+      throw Exception('Firestore error: ${e.message}');
+    } on Exception catch (e) {
+      _logger.e('An unknown error occurred: $e');
+      throw Exception('Unknown error: $e');
     }
-
-    // Create user with Firebase Authentication
-    UserCredential userCredential = await _firebaseAuth
-        .createUserWithEmailAndPassword(email: email, password: password);
-
-    _logger.i('User created with UID: ${userCredential.user!.uid}');
-
-    // Request OTP
-    await requestOtp(userCredential.user!.uid); // Use userId
-
-    // Navigate to the verification screen with the user ID and email
-    String userId = userCredential.user!.uid; // Use userId instead of user
-    _logger.i('Navigating to Verification with email: $email');
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => Verification(userId: userId, email: email), // Pass email
-      ),
-      
-    );
-  } on FirebaseAuthException catch (e) {
-    _handleFirebaseAuthErrors(e);
-  } on FirebaseException catch (e) {
-    _logger.e(
-        'FirebaseException occurred when saving user to Firestore: ${e.code}: ${e.message}');
-    throw Exception('Firestore error: ${e.message}');
-  } on Exception catch (e) {
-    _logger.e('An unknown error occurred: $e');
-    throw Exception('Unknown error: $e');
   }
-}
 
   // Function to generate a random 6-digit OTP
   String generateOtp() {
@@ -139,27 +139,7 @@ class Auth {
     }
   }
 
-  // Function to verify OTP
-  Future<bool> verifyOtp(String userId, String enteredOtp) async {
-    DocumentSnapshot doc =
-        await _firestore.collection('otps').doc(userId).get(); // Use userId
-
-    if (!doc.exists) {
-      return false;
-    }
-
-    String storedOtp = doc['otp'];
-    Timestamp? createdAt = doc['createdAt'];
-
-    // Check if OTP is still valid (e.g., within 10 minutes)
-    if (DateTime.now()
-            .isBefore((createdAt!.toDate()).add(const Duration(minutes: 10))) &&
-        storedOtp == enteredOtp) {
-      return true; // OTP verified successfully
-    } else {
-      return false; // OTP verification failed or expired
-    }
-  }
+  
 
   // Method to clean up expired OTPs
   Future<void> cleanupExpiredOtps() async {

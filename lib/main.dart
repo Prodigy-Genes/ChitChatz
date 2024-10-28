@@ -39,6 +39,7 @@ class ChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       routes: {
         '/signup': (context) => const Signup(),
         '/signin': (context) => const Login(),
