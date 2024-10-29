@@ -3,10 +3,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math'; // Import for generating OTP
+import 'package:chatapp/model/user.dart';
+import 'package:chatapp/screens/home.dart';
 import 'package:chatapp/screens/verification.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:flutter/material.dart';
@@ -15,17 +18,98 @@ class Auth {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Logger _logger = Logger();
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   User? get currentUser => _firebaseAuth.currentUser;
 
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
   Future<void> signinWithEmailAndPassword({
+    required BuildContext
+        context, // Add context parameter for ScaffoldMessenger
     required String email,
     required String password,
   }) async {
-    await _firebaseAuth.signInWithEmailAndPassword(
-        email: email, password: password);
+    try {
+      _logger.i('Attempting to sign in with email: $email');
+
+      // Step 1: Sign in with Firebase Authentication
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      _logger.i('Sign-in successful for email: $email');
+
+      // Step 2: Check if user data exists in Firestore
+      DocumentSnapshot userDoc = await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        _logger.w('User document not found in Firestore for email: $email');
+
+        // Alert the user to sign up
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User data not found. Please sign up to continue.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        _logger.i('User document found in Firestore for email: $email');
+      }
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+          _logger.w('No user found for email: $email');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No user found for this email.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          break;
+        case 'wrong-password':
+          _logger.w('Wrong password provided for email: $email');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Incorrect password. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          break;
+        case 'invalid-email':
+          _logger.w('Invalid email format for: $email');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid email format.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          break;
+        default:
+          _logger.e('An unexpected error occurred: ${e.message}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('An error occurred. Please try again later.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+      }
+      rethrow;
+    } catch (e, stacktrace) {
+      _logger.e('An unknown error occurred during sign-in, $e, $stacktrace');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('An unknown error occurred. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      rethrow;
+    }
   }
 
   Future<void> createWithEmailAndPassword({
@@ -139,18 +223,91 @@ class Auth {
     }
   }
 
-  
-
   // Method to clean up expired OTPs
   Future<void> cleanupExpiredOtps() async {
     final now = DateTime.now();
     final querySnapshot = await _firestore.collection('otps').get();
 
     for (var doc in querySnapshot.docs) {
-      Timestamp createdAt = doc['createdAt'];
-      if (now.isAfter(createdAt.toDate().add(const Duration(minutes: 10)))) {
-        await doc.reference.delete(); // Delete expired OTP
+      if (doc['createdAt'] is Timestamp) {
+        // Check if createdAt is of type Timestamp
+        Timestamp createdAt = doc['createdAt'];
+        if (now.isAfter(createdAt.toDate().add(const Duration(minutes: 10)))) {
+          await doc.reference.delete(); // Delete expired OTP
+        }
       }
+    }
+  }
+
+  Future<void> signInWithGoogle(BuildContext context) async {
+    try {
+      _logger.i('Attempting to sign in with Google');
+
+      // Trigger the Google Authentication flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _logger.w('Google sign-in aborted by user');
+        return; // The user canceled the sign-in
+      }
+
+      // Obtain the Google Auth details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credentials
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
+      _logger.i(
+          'Google sign-in successful for email: ${userCredential.user!.email}');
+
+      // Save user data to Firestore
+      await _saveUserToFirestore(userCredential.user);
+
+      // Navigate to the main app screen or any other screen
+      Navigator.of(context)
+          .pushReplacement(MaterialPageRoute(builder: (context) => const Home()));
+    } on FirebaseAuthException catch (e) {
+      _handleFirebaseAuthErrors(e);
+    } catch (e) {
+      _logger.e('An error occurred during Google sign-in: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'An error occurred during Google sign-in. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _saveUserToFirestore(User? user) async {
+    if (user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+
+      if (!userDoc.exists) {
+        UserModel newUser = UserModel(
+          uid: user.uid,
+          username: user.displayName ?? 'New User',
+          email: user.email ?? '',
+          createdAt: DateTime.now(),
+        );
+
+        _logger.i("Saving user details to Firestore: ${newUser.toMap()}");
+
+        await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+        _logger.i('User saved to Firestore with UID: ${user.uid}');
+      } else {
+        _logger.i('User already exists in Firestore: ${user.uid}');
+      }
+    } else {
+      _logger.e('No user found during save operation.');
     }
   }
 

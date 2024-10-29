@@ -59,43 +59,7 @@ class _SignupState extends State<Signup> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Google Sign-In Button
-            Center(
-              child: GestureDetector(
-                onTap: () {
-                  // Handle Google Sign-In logic
-                },
-                child: Container(
-                  height: 50,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        'assets/icons/google.png',
-                        height: 24,
-                        width: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Sign up with Google',
-                        style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Kavivanar'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            
             const SizedBox(
               height: 20,
             ),

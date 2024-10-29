@@ -1,3 +1,4 @@
+import 'package:chatapp/authentication/auth.dart';
 import 'package:chatapp/authentication/signin_form.dart';
 import 'package:chatapp/widgets/loginheader.dart';
 import 'package:flutter/material.dart';
@@ -65,8 +66,9 @@ class _LoginState extends State<Login> {
             // Google Sign-In Button
             Center(
               child: GestureDetector(
-                onTap: () {
+                onTap: () async{
                   // Handle Google Sign-In logic
+                   await Auth().signInWithGoogle(context);
                 },
                 child: Container(
                   height: 50,

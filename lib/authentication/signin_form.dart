@@ -1,5 +1,7 @@
-// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously
 
+import 'package:chatapp/authentication/auth.dart';
+import 'package:chatapp/screens/home.dart';
 import 'package:flutter/material.dart';
 import 'auth_button.dart'; // Assuming this is the button file you'll create
 
@@ -14,6 +16,7 @@ class _SignInFormState extends State<SignInForm> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -96,19 +99,71 @@ class _SignInFormState extends State<SignInForm> {
             const SizedBox(height: 10),
 
             // Sign In Button
-            AuthButton(
-              text: 'Sign In',
-              color: Colors.purple,
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Handle sign in logic here
-                  
-                }
-              },
-            ),
+            isLoading
+                ? const CircularProgressIndicator() // Show loading indicator
+                : AuthButton(
+                    text: 'Sign In',
+                    color: Colors.purple,
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        _signin(); // Call the sign-in method
+                      }
+                    },
+                  )
           ],
         ),
       ),
     );
   }
+
+  Future<void> _signin() async {
+  final auth = Auth(); // Create an instance of the Auth class
+  final email = _emailController.text;
+  final password = _passwordController.text;
+
+  setState(() {
+    isLoading = true; // Start loading
+  });
+
+  try {
+    // Use the new method for signing in
+    await auth.signinWithEmailAndPassword(
+      email: email,
+      password: password,
+      context: context,
+    );
+
+    // If successful, show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('SignIn executed successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Navigate to home after a brief delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Force navigation to Home
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const Home()), // Change this to your Home widget
+      );
+    }
+  } catch (e) {
+    // Handle error
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('SignIn failed: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() {
+      isLoading = false; // End loading
+    });
+  }
+}
+
 }
