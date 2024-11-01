@@ -36,29 +36,7 @@ class _SignupState extends State<Signup> {
             const SizedBox(
               height: 2,
             ),
-            // Separator line
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                children: [
-                  Expanded(
-                      child: Divider(color: Colors.grey[400], thickness: 1)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10.0),
-                    child: Text(
-                      'Or sign up with',
-                      style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontFamily: 'Kavivanar'),
-                    ),
-                  ),
-                  Expanded(
-                      child: Divider(color: Colors.grey[400], thickness: 1)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+            
             
             const SizedBox(
               height: 20,

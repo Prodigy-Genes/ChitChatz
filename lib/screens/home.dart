@@ -1,10 +1,11 @@
 // ignore_for_file: library_private_types_in_public_api
 
-import 'package:chatapp/authentication/signout.dart';
+import 'package:chatapp/widgets/user_info.dart';
 import 'package:flutter/material.dart';
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  final String userId;
+  const Home({super.key, required this.userId});
 
   @override
   _HomeState createState() => _HomeState();
@@ -25,14 +26,16 @@ class _HomeState extends State<Home> {
           ),
         ),
         backgroundColor: Colors.blueAccent,
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: Signout(),
-          ),
+            padding: const EdgeInsets.only(right: 20),
+            child: UserInfo(userId: widget.userId),
+          )
         ],
       ),
-      body: const Center(child: Text('Home')),
+      body: const Center(
+        child: Text('Home'), // Display UserInfo widget with the userId
+      ),
     );
   }
 }

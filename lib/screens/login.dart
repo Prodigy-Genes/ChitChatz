@@ -65,11 +65,20 @@ class _LoginState extends State<Login> {
 
             // Google Sign-In Button
             Center(
-              child: GestureDetector(
-                onTap: () async{
+              child: InkWell(
+                onTap: () async {
+                  // Show a loading indicator while signing in
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Signing in...'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+
                   // Handle Google Sign-In logic
-                   await Auth().signInWithGoogle(context);
+                  await Auth().signInWithGoogle(context);
                 },
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
                   height: 50,
                   width: double.infinity,
@@ -90,10 +99,11 @@ class _LoginState extends State<Login> {
                       const Text(
                         'Sign in with Google',
                         style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Kavivanar'),
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Kavivanar',
+                        ),
                       ),
                     ],
                   ),

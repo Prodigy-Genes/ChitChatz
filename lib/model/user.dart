@@ -5,12 +5,18 @@ class UserModel {
   final String username;
   final String email;
   final DateTime createdAt;
+  final String profilePictureUrl;
+  final bool isUserOnline;
+  final bool isEmailVerified; 
 
   UserModel({
     required this.uid,
     required this.username,
     required this.email,
     required this.createdAt,
+    required this.profilePictureUrl,
+    required this.isUserOnline,
+    required this.isEmailVerified, 
   });
 
   // Factory constructor to create a UserModel from a Firestore document snapshot
@@ -20,6 +26,9 @@ class UserModel {
       username: data['username'] ?? '',
       email: data['email'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      profilePictureUrl: data['profilePicture'] ?? '',
+      isUserOnline: data['isUserOnline'] ?? false,
+      isEmailVerified: data['isEmailVerified'] ?? false, 
     );
   }
 
@@ -29,6 +38,9 @@ class UserModel {
       'username': username,
       'email': email,
       'createdAt': createdAt,
+      'profilePictureUrl': profilePictureUrl,
+      'isUserOnline': isUserOnline,
+      'isEmailVerified': isEmailVerified, 
     };
   }
 
@@ -39,6 +51,9 @@ class UserModel {
       username: map['username'] ?? '',
       email: map['email'] ?? '',
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+      profilePictureUrl: map['profilePicture'] ?? '',
+      isUserOnline: map['isUserOnline'] ?? false,
+      isEmailVerified: map['isEmailVerified'] ?? false, 
     );
   }
 }

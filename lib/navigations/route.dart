@@ -104,7 +104,7 @@ void initState() {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Home()),
+        MaterialPageRoute(builder: (context) => Home(userId:user!.uid ,)),
       );
     }
   });

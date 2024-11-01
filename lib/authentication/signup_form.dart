@@ -214,7 +214,7 @@ class _SignUpFormState extends State<SignUpForm> {
       // If successful, show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Account created successfully! Please check your email for the OTP.'),
+          content: Text('Account created successfully! Please verify your email when you get the chance.'),
           backgroundColor: Colors.green,
         ),
       );
