@@ -17,6 +17,7 @@ class _HomeState extends State<Home> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: const Color(0xFF6C63FF),
         title: const Text(
           'ChitChatz',
           style: TextStyle(
@@ -25,8 +26,7 @@ class _HomeState extends State<Home> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.blueAccent,
-        actions: [
+         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 20),
             child: UserInfo(userId: widget.userId),

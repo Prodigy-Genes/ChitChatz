@@ -3,7 +3,6 @@
 import 'package:chatapp/authentication/auth.dart';
 import 'package:chatapp/screens/home.dart';
 import 'package:chatapp/screens/signup.dart';
-import 'package:chatapp/screens/verification.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
@@ -51,16 +50,7 @@ void initState() {
       if (hasValidUserData) {
         print("User has valid data, navigating to Home."); // Debug log
         _navigateToHome();
-      } else {
-        bool isEmailVerified = refreshedUser.emailVerified;
-        if (isEmailVerified) {
-          print("Email verified, navigating to Signup."); // Debug log
-          _navigateToSignup();
-        } else {
-          print("Email not verified, navigating to Verification."); // Debug log
-          _navigateToVerification(refreshedUser.email);
-        }
-      }
+      } 
     }
   } catch (e) {
     // Handle errors
@@ -73,19 +63,7 @@ void initState() {
 
 
 
-  void _handleUserDataCheck(User refreshedUser) {
-    bool isEmailVerified = refreshedUser.emailVerified;
-    _logger.d('Email verified: $isEmailVerified');
-
-    if (isEmailVerified) {
-      _logger
-          .w('User data not found but email is verified, navigating to signup');
-      _navigateToSignup();
-    } else {
-      _logger.w('Email not verified, navigating to verification');
-      _navigateToVerification(refreshedUser.email);
-    }
-  }
+  
 
   void _handleError(dynamic e) {
     if (e is FirebaseAuthException && e.code == 'user-not-found') {
@@ -123,17 +101,7 @@ void initState() {
 
 
   // Navigate to the verification screen
-  void _navigateToVerification(String? email) {
-    if (user != null && email != null && email.isNotEmpty) {
-      _navigateToScreen(Verification(userId: user!.uid, email: email));
-    } else {
-      _logger.e('User is not authenticated or email is null.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('User is not authenticated or email is missing.')),
-      );
-    }
-  }
+  
 
   // General method to handle screen navigation
   void _navigateToScreen(Widget screen) {

@@ -20,27 +20,29 @@ class Auth {
 
    Future<void> signinWithEmailAndPassword({
     required BuildContext
-        context, // Add context parameter for ScaffoldMessenger
+        context, 
     required String email,
     required String password,
   }) async {
     try {
       _logger.i('Attempting to sign in with email: $email');
 
-      // Step 1: Sign in with Firebase Authentication
+      // Sign in with Firebase Authentication
       UserCredential userCredential =
           await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      _logger.i('Sign-in successful for email: $email');
+      
 
-      // Step 2: Check if user data exists in Firestore
+      // Check if user data exists in Firestore
       DocumentSnapshot userDoc = await _firestore
           .collection('users')
           .doc(userCredential.user!.uid)
           .get();
+
+          
 
       if (!userDoc.exists) {
         _logger.w('User document not found in Firestore for email: $email');
@@ -54,6 +56,7 @@ class Auth {
         );
       } else {
         _logger.i('User document found in Firestore for email: $email');
+        _logger.i('Sign-in successful for email: $email');
       }
     } on FirebaseAuthException catch (e) {
       _handleFirebaseAuthErrors(e);
@@ -108,7 +111,7 @@ class Auth {
   }
 
 
-  Future<void> createWithEmailAndPassword({
+  Future<UserCredential> createWithEmailAndPassword({
     required String username,
     required String email,
     required String password,
@@ -129,7 +132,7 @@ class Auth {
       // Save user details to Firestore
       _logger.i('Adding user to database');
 
-      await _saveUserToFirestore(userCredential.user);
+      await _saveUserToFirestore(userCredential.user, username);
 
       // Navigate to the home screen directly
       String userId = userCredential.user!.uid;
@@ -139,8 +142,10 @@ class Auth {
             builder: (context) => Home(userId: userCredential.user!.uid)),
         (Route<dynamic> route) => false,
       );
+      return userCredential;
     } on FirebaseAuthException catch (e) {
       _handleFirebaseAuthErrors(e);
+      rethrow;
     } on FirebaseException catch (e) {
       _logger.e(
           'FirebaseException occurred when saving user to Firestore: ${e.code}: ${e.message}');
@@ -157,7 +162,10 @@ class Auth {
     } on Exception catch (e) {
       _logger.e('An unknown error occurred: $e');
       throw Exception('Unknown error: $e');
+
     }
+
+    throw Exception('Unexpected error occurred in createWithEmailAndPassword');
   }
 
   Future<void> signInWithGoogle(BuildContext context) async {
@@ -183,8 +191,10 @@ class Auth {
     _logger.i(
         'Google sign-in successful for email: ${userCredential.user!.email}');
 
+    String username = googleUser.displayName ?? 'User';
+
     // Save user to Firestore
-    await _saveUserToFirestore(userCredential.user);
+    await _saveUserToFirestore(userCredential.user, username);
 
     await _updateUserOnlineStatus(true);
 
@@ -203,11 +213,12 @@ class Auth {
         backgroundColor: Colors.red,
       ),
     );
+
   }
 }
 
   // Method to save user to Firestore
-  Future<void> _saveUserToFirestore(User? user) async {
+  Future<void> _saveUserToFirestore(User? user, String username) async {
   if (user != null) {
     final userRef = _firestore.collection('users').doc(user.uid);
     DocumentSnapshot userDoc = await userRef.get();
@@ -215,7 +226,7 @@ class Auth {
     if (!userDoc.exists) {
       // If the user doesn't exist, create new data
       final userData = {
-        'username': user.displayName,
+        'username': username,
         'email': user.email,
         'profilePictureUrl': user.photoURL,
         'createdAt': FieldValue.serverTimestamp(),

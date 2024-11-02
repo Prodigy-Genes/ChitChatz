@@ -1,6 +1,10 @@
 // ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously, avoid_print
 
 import 'package:chatapp/authentication/auth.dart';
+import 'package:chatapp/features/user_status.dart';
+import 'package:chatapp/model/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'auth_button.dart';
 
@@ -198,34 +202,59 @@ class _SignUpFormState extends State<SignUpForm> {
   }
 
   Future<void> _signup() async {
-    final auth = Auth(); // Create an instance of the Auth class
-    final email = _emailController.text;
-    final password = _passwordController.text;
+  final auth = Auth(); // Create an instance of the Auth class
+  final email = _emailController.text;
+  final password = _passwordController.text;
 
-    try {
-      // Use the new method for creating an account
-      await auth.createWithEmailAndPassword(
-        username: _usernameController.text,
-        email: email,
-        password: password,
-        context: context, // Pass context to navigate
+  try {
+    // Use the new method for creating an account
+    UserCredential userCredential = await auth.createWithEmailAndPassword(
+      username: _usernameController.text,
+      email: email,
+      password: password,
+      context: context, // Pass context to navigate
+    );
+
+    // Get the userId from FirebaseAuth
+    final userId = userCredential.user?.uid;
+
+    if (userId != null) {
+      // Fetch the user's document from Firestore using the userId
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      // Create UserModel instance from Firestore data
+      UserModel userModel = UserModel.fromDocumentSnapshot(
+        userDoc.data() as Map<String, dynamic>,
+        userId,
       );
 
-      // If successful, show success message
+      // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Account created successfully! Please verify your email when you get the chance.'),
+          content: Text(
+              'Account created successfully! Please verify your email when you get the chance.'),
           backgroundColor: Colors.green,
         ),
       );
-    } catch (e) {
-      // Handle error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sign up failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+
+      // Update user online status
+      getUserOnlineStatus(userModel.uid).listen((isOnline) {
+        print("User is online: $isOnline");
+        // You can also update the UI here based on the user's online status
+      });
     }
+  } catch (e) {
+    // Handle error by showing a SnackBar with the error message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sign up failed: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 }

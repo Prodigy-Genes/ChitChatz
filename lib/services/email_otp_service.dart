@@ -2,22 +2,27 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logger/logger.dart';
 
 class OtpService {
   final Logger _logger = Logger();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<String> generateOtp() async {
     final String otp = (100000 + (Random().nextInt(900000))).toString();
+    _logger.d('Generated OTP: $otp'); // Log the generated OTP
     return otp; // Generates a 6-digit OTP
   }
 
   Future<void> sendOtpEmail(String email, String otpCode) async {
+    
     String serviceId = dotenv.env['SERVICE_ID'] ?? '';
     String templateId = dotenv.env['TEMPLATE_ID'] ?? '';
     String userId = dotenv.env['USER_ID'] ?? '';
+
+    if (serviceId.isEmpty || templateId.isEmpty || userId.isEmpty) {
+      _logger.e('Email service configuration is missing. Check .env variables.');
+      throw Exception('Email service configuration is missing.');
+    }
 
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
@@ -42,63 +47,11 @@ class OtpService {
         throw Exception(
             'Failed to send OTP: ${response.statusCode} - ${response.body}');
       }
+
+      _logger.i('OTP sent successfully to $email'); // Log success
     } catch (e) {
       _logger.e('Error sending OTP: $e');
       throw Exception('An error occurred while sending OTP: $e');
-    }
-  }
-
-  Future<void> storeOtp(String userId, String otp) async {
-    try {
-      final otpData = {
-        'otp': otp,
-        'createdAt': FieldValue.serverTimestamp(), // Store creation timestamp
-      };
-
-      await _firestore.collection('users').doc(userId).collection('otps').add(otpData);
-      _logger.i('Stored OTP for userId: $userId');
-    } catch (e) {
-      _logger.e('Error storing OTP: $e');
-      throw Exception('Failed to store OTP: $e');
-    }
-  }
-
-  Future<bool> verifyOtp(String userId, String otp) async {
-    try {
-      final otpDocs = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('otps')
-          .where('otp', isEqualTo: otp)
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .get();
-
-      if (otpDocs.docs.isNotEmpty) {
-        // OTP found, verify it here (you may want to add expiration logic)
-        return true; // OTP is valid
-      }
-      return false; // OTP not found
-    } catch (e) {
-      _logger.e('Error verifying OTP: $e');
-      return false; // Failed to verify OTP
-    }
-  }
-
-  Future<void> cleanupExpiredOtps(String userId) async {
-    final now = DateTime.now();
-    const expirationDuration = Duration(minutes: 5); // Set expiration duration
-
-    final expiredOtps = await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('otps')
-        .where('createdAt', isLessThan: now.subtract(expirationDuration))
-        .get();
-
-    for (var doc in expiredOtps.docs) {
-      await doc.reference.delete();
-      _logger.i('Deleted expired OTP for userId: $userId, OTP: ${doc.data()}');
     }
   }
 }
