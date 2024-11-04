@@ -1,10 +1,14 @@
 // ignore_for_file: use_super_parameters, library_private_types_in_public_api, use_build_context_synchronously
 
 import 'dart:async';
+import 'package:chatapp/screens/add_friends.dart';
+import 'package:chatapp/screens/friends.dart';
+import 'package:chatapp/screens/notfication.dart';
 import 'package:chatapp/services/email_otp_service.dart';
 import 'package:chatapp/authentication/signout.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:logger/logger.dart';
 
 import '../screens/verification.dart';
@@ -78,8 +82,59 @@ class _UserInfoModalState extends State<UserInfoModal> {
 
               // Options List
               ListTile(
+                leading: const Icon(Icons.people_sharp),
+                title: Text('Add Friends',
+                    style: GoogleFonts.kavivanar(
+                      color: Colors.black,
+                    )),
+                onTap: () {
+                  logger.i("Navigating to Add Friends Screen");
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AddFriends()));
+                },
+              ),
+
+              ListTile(
+                leading: const Icon(Icons.person_4_outlined),
+                title: Text('Friends List',
+                    style: GoogleFonts.kavivanar(
+                      color: Colors.black,
+                    )),
+                onTap: () {
+                  logger.i("Navigating to Friends Screen");
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              Friends(userId: widget.userId)));
+                },
+              ),
+
+              ListTile(
+                leading: const Icon(Icons.notification_important),
+                title: Text('Notifications',
+                    style: GoogleFonts.kavivanar(
+                      color: Colors.black,
+                    )),
+                onTap: () {
+                  logger.i("Navigating to Notifications");
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => NotificationsScreen(
+                                userId: widget.userId,
+                              )));
+                },
+              ),
+
+              ListTile(
                 leading: const Icon(Icons.person),
-                title: const Text('Verify Email', style: TextStyle(fontFamily: 'Kavivanar'),),
+                title: const Text(
+                  'Verify Email',
+                  style: TextStyle(fontFamily: 'Kavivanar'),
+                ),
                 onTap: () async {
                   logger.i('Verify Email tapped for userId: ${widget.userId}');
 
@@ -89,6 +144,29 @@ class _UserInfoModalState extends State<UserInfoModal> {
                   }
 
                   try {
+                    final userDoc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.userId)
+                        .get();
+
+                    if (userDoc.exists &&
+                        userDoc.data()?['isEmailVerified'] == true) {
+                      logger.i(
+                          'Email is already verified for userId: ${widget.userId}');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Email is already verified!🎉',
+                              style: TextStyle(fontFamily: 'Kavivanar'),
+                            ),
+                            backgroundColor: Colors.greenAccent,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     // Generate OTP
                     final otpCode = await otpService.generateOtp();
                     logger.i('Generated OTP: $otpCode');
