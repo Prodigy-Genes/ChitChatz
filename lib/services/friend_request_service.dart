@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_print, unnecessary_brace_in_string_interps
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
@@ -33,12 +31,9 @@ class FriendRequestService {
       for (var snapshot in requests) {
         if (snapshot.docs.isNotEmpty) {
           final status = snapshot.docs.first.data()['status'] as String;
-          if (status == 'pending') return FriendRequestStatus.pending;
-          if (status == 'accepted') return FriendRequestStatus.accepted;
-          if (status == 'rejected') return FriendRequestStatus.rejected;
+          return status.toFriendRequestStatus();
         }
       }
-
       return FriendRequestStatus.none;
     } catch (e) {
       logger.e('Error checking friend request status: $e');
@@ -46,20 +41,69 @@ class FriendRequestService {
     }
   }
 
+  Future<void> sendFriendRequest(String targetUserId) async {
+    try {
+      final currentUserId = _auth.currentUser?.uid;
+      if (currentUserId == null) {
+        throw Exception('No user logged in');
+      }
+
+      // Check if a request already exists
+      final existingStatus = await checkFriendRequestStatus(targetUserId);
+      if (existingStatus != FriendRequestStatus.none) {
+        throw Exception(
+            'A friend request already exists or users are already friends');
+      }
+
+      // Use a transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        // Fetch sender's user data
+        final senderDoc = await transaction
+            .get(_firestore.collection('users').doc(currentUserId));
+
+        if (!senderDoc.exists) {
+          throw Exception('Sender user data not found');
+        }
+
+        final senderData = senderDoc.data() as Map<String, dynamic>;
+        final senderUsername = senderData['username'] ?? 'Unknown User';
+
+        // Create a unique ID for the friend request
+        final requestId = '${currentUserId}_$targetUserId';
+
+        // Create the friend request document
+        final friendRequestRef =
+            _firestore.collection('friendRequests').doc(requestId);
+        transaction.set(friendRequestRef, {
+          'senderId': currentUserId,
+          'receiverId': targetUserId,
+          'status': 'pending',
+          'timestamp': FieldValue.serverTimestamp(),
+          'senderUsername': senderUsername,
+        });
+      });
+
+      logger.i(
+          'Friend request sent successfully from $currentUserId to $targetUserId');
+    } catch (e) {
+      logger.e('Error sending friend request: $e');
+      rethrow;
+    }
+  }
+
   Future<void> addFriend(String senderId, String receiverId) async {
     try {
-      // Create a unique ID for friends relationship
       final friendDocId = senderId.compareTo(receiverId) < 0
-          ? '${senderId}_${receiverId}'
-          : '${receiverId}_${senderId}';
+          ? '${senderId}_$receiverId'
+          : '${receiverId}_$senderId';
 
-      // Update friends collection with both users
+      // Update friends collection
       await _firestore.collection('friends').doc(friendDocId).set({
         'users': [senderId, receiverId],
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Update friend request status to accepted
+      // Update friend request status
       final requestQuery = await _firestore
           .collection('friendRequests')
           .where('senderId', isEqualTo: senderId)
@@ -93,7 +137,7 @@ class FriendRequestService {
         });
       }
     } catch (e) {
-      print('Error rejecting friend request: $e');
+      logger.e('Error rejecting friend request: $e');
       rethrow;
     }
   }
@@ -109,60 +153,5 @@ class FriendRequestService {
         return users.where((id) => id != userId);
       }).toList();
     });
-  }
-
-  Future<void> sendFriendRequest(String targetUserId) async {
-    try {
-      final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) {
-        throw Exception('No user logged in');
-      }
-
-      // Check if a request already exists
-      final existingStatus = await checkFriendRequestStatus(targetUserId);
-      if (existingStatus != FriendRequestStatus.none) {
-        throw Exception(
-            'A friend request already exists or users are already friends');
-      }
-
-      // Fetch sender's user data
-      final senderDoc = await _firestore
-          .collection('users')
-          .doc(currentUserId)
-          .get();
-      
-      if (!senderDoc.exists) {
-        throw Exception('Sender user data not found');
-      }
-
-      final senderData = senderDoc.data() as Map<String, dynamic>;
-      final senderUsername = senderData['username'] ?? 'Unknown User';
-
-      // Create a unique ID for the friend request
-      final requestId = '${currentUserId}_${targetUserId}';
-
-      // Create the friend request document
-      await _firestore.collection('friendRequests').doc(requestId).set({
-        'senderId': currentUserId,
-        'receiverId': targetUserId,
-        'status': 'pending',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Create notification for the receiver with sender's username
-      await _firestore.collection('notifications').add({
-        'userId': targetUserId,
-        'type': 'friendRequest',
-        'senderId': currentUserId,
-        'senderUsername': senderUsername,  // Add sender's username
-        'status': 'unread',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      
-      logger.i('Friend request sent successfully from $senderUsername');
-    } catch (e) {
-      logger.e('Error sending friend request: $e');
-      rethrow;
-    }
   }
 }

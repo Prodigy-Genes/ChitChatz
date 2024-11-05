@@ -70,7 +70,7 @@ class NotificationHelper {
         NotificationService().markAllNotificationsAsRead(notification.id!);
         break;
       case 'mark_unread':
-        NotificationService().markAllNotificationsAsUnRead(notification.id!);
+        NotificationService().markAllNotificationsAsUnread(notification.id!);
         break;
       case 'delete':
         NotificationService().deleteNotification(notification.id!);

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:chatapp/model/notification.dart';
 import 'package:chatapp/services/notification_service.dart';
 
-
 class NotificationList extends StatelessWidget {
   final String currentUserId;
 
@@ -12,7 +11,7 @@ class NotificationList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<NotificationModel>>(
-      stream: NotificationService().getNotifications(),
+      stream: NotificationService().getNotifications(currentUserId), // Pass currentUserId here
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _buildErrorContent(context, snapshot.error.toString());

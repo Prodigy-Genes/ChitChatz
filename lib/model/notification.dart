@@ -32,13 +32,13 @@ class NotificationModel {
     final data = snapshot.data()!;
     return NotificationModel(
       id: snapshot.id,
-      senderId: data['senderId'],
-      senderName: data['senderName'], // Added senderName
-      receiverId: data['receiverId'],
-      receiverName: data['receiverName'], // Added receiverName
-      message: data['message'],
+      senderId: data['senderId'] ?? '', // Default to empty string if null
+      senderName: data['senderName'] ?? 'Unknown User', // Default value for senderName
+      receiverId: data['receiverId'] ?? '', // Default to empty string if null
+      receiverName: data['receiverName'] ?? 'Unknown User', // Default value for receiverName
+      message: data['message'] ?? '', // Default to empty string if null
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      type: data['type'],
+      type: data['type'] ?? 'unknown', // Default to 'unknown' if null
       status: data['status'] ?? 'unread',
       data: Map<String, dynamic>.from(data['data'] ?? {}),
     );

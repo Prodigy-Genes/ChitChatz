@@ -1,4 +1,5 @@
-import 'package:chatapp/model/notification.dart';
+// ignore_for_file: avoid_print, use_build_context_synchronously
+
 import 'package:chatapp/services/friend_request_service.dart';
 import 'package:chatapp/services/friend_request_status.dart';
 import 'package:chatapp/services/notification_service.dart';
@@ -142,22 +143,31 @@ class UserTile extends StatelessWidget {
 
                           // If the user confirmed, send the friend request
                           if (shouldAddFriend == true) {
-                            await FriendRequestService()
-                                .sendFriendRequest(userId);
-                            // Create a notification
-                            final notification = NotificationModel(
-                              senderId: currentUserId,
-                              senderName: currentUserDisplayName, // Use the current user's display name
-                              receiverId: userId,
-                              receiverName: username, // Get the receiver's username
-                              message: '$currentUserDisplayName has sent you a friend request.', // Correct message
-                              timestamp: DateTime.now(),
-                              type: 'friend_request',
-                            );
+                            try {
+                              await FriendRequestService()
+                                  .sendFriendRequest(userId);
 
-                            // Send the notification
-                            await NotificationService()
-                                .sendFriendRequestNotification(notification);
+                              // Send the notification
+                              await NotificationService()
+                                  .sendFriendRequestNotification(
+                                receiverId: userId,
+                                receiverName: username,
+                                type: 'friend_request',
+                              );
+
+                              // Optionally log success
+                              print(
+                                  'Friend request sent and notification delivered to $username');
+                            } catch (e) {
+                              // Handle any errors
+                              print(
+                                  'Failed to send friend request or notification: $e');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Error sending friend request')),
+                              );
+                            }
                           }
                         }
                       : null,
