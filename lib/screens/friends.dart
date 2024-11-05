@@ -1,5 +1,6 @@
 import 'package:chatapp/services/friend_request_service.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Friends extends StatelessWidget {
   final String userId;
@@ -8,7 +9,13 @@ class Friends extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Friends')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF6C63FF),
+          title: Text(
+        'Friends-[Tomodachi]',
+        style: GoogleFonts.kavivanar(color: Colors.white),
+      )),
       body: StreamBuilder<List<String>>(
         stream: FriendRequestService().getFriends(userId),
         builder: (context, snapshot) {

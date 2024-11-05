@@ -10,7 +10,8 @@ class FriendRequestService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Logger logger = Logger();
 
-  Future<FriendRequestStatus> checkFriendRequestStatus(String targetUserId) async {
+  Future<FriendRequestStatus> checkFriendRequestStatus(
+      String targetUserId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return FriendRequestStatus.none;
 
@@ -71,53 +72,28 @@ class FriendRequestService {
           'acceptedAt': FieldValue.serverTimestamp(),
         });
       }
-
-      // Add notification for acceptance
-      await _firestore.collection('notifications').add({
-        'userId': senderId,
-        'type': 'friendRequestAccepted',
-        'otherUserId': receiverId,
-        'status': 'unread',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
     } catch (e) {
       logger.e('Error adding friend: $e');
       rethrow;
     }
   }
 
-  Future<void> rejectRequest(String requestId) async {
+  Future<void> rejectFriendRequest(String senderId, String receiverId) async {
     try {
-      // Get the request document
-      final requestDoc = await _firestore
+      final requestQuery = await _firestore
           .collection('friendRequests')
-          .doc(requestId)
+          .where('senderId', isEqualTo: senderId)
+          .where('receiverId', isEqualTo: receiverId)
           .get();
 
-      if (!requestDoc.exists) {
-        throw Exception('Friend request not found');
+      if (requestQuery.docs.isNotEmpty) {
+        await requestQuery.docs.first.reference.update({
+          'status': 'rejected',
+          'rejectedAt': FieldValue.serverTimestamp(),
+        });
       }
-
-      final data = requestDoc.data()!;
-      final senderId = data['senderId'] as String;
-      final receiverId = data['receiverId'] as String;
-
-      // Update the request status
-      await requestDoc.reference.update({
-        'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Add notification for rejection
-      await _firestore.collection('notifications').add({
-        'userId': senderId,
-        'type': 'friendRequestRejected',
-        'otherUserId': receiverId,
-        'status': 'unread',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
     } catch (e) {
-      logger.e('Error rejecting request: $e');
+      print('Error rejecting friend request: $e');
       rethrow;
     }
   }
@@ -145,8 +121,22 @@ class FriendRequestService {
       // Check if a request already exists
       final existingStatus = await checkFriendRequestStatus(targetUserId);
       if (existingStatus != FriendRequestStatus.none) {
-        throw Exception('A friend request already exists or users are already friends');
+        throw Exception(
+            'A friend request already exists or users are already friends');
       }
+
+      // Fetch sender's user data
+      final senderDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .get();
+      
+      if (!senderDoc.exists) {
+        throw Exception('Sender user data not found');
+      }
+
+      final senderData = senderDoc.data() as Map<String, dynamic>;
+      final senderUsername = senderData['username'] ?? 'Unknown User';
 
       // Create a unique ID for the friend request
       final requestId = '${currentUserId}_${targetUserId}';
@@ -159,14 +149,17 @@ class FriendRequestService {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Create notification for the receiver
+      // Create notification for the receiver with sender's username
       await _firestore.collection('notifications').add({
         'userId': targetUserId,
         'type': 'friendRequest',
         'senderId': currentUserId,
+        'senderUsername': senderUsername,  // Add sender's username
         'status': 'unread',
         'timestamp': FieldValue.serverTimestamp(),
       });
+      
+      logger.i('Friend request sent successfully from $senderUsername');
     } catch (e) {
       logger.e('Error sending friend request: $e');
       rethrow;

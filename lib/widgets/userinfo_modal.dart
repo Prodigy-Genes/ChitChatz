@@ -3,9 +3,9 @@
 import 'dart:async';
 import 'package:chatapp/screens/add_friends.dart';
 import 'package:chatapp/screens/friends.dart';
-import 'package:chatapp/screens/notfication.dart';
 import 'package:chatapp/services/email_otp_service.dart';
 import 'package:chatapp/authentication/signout.dart';
+import 'package:chatapp/widgets/notification_list_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -112,20 +112,9 @@ class _UserInfoModalState extends State<UserInfoModal> {
                 },
               ),
 
-              ListTile(
-                leading: const Icon(Icons.notification_important),
-                title: Text('Notifications',
-                    style: GoogleFonts.kavivanar(
-                      color: Colors.black,
-                    )),
-                onTap: () {
-                  logger.i("Navigating to Notifications");
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => NotificationsScreen(
-                                userId: widget.userId,
-                              )));
+              Builder(
+                builder: (context) {
+                  return NotificationsListTile(userId: widget.userId);
                 },
               ),
 

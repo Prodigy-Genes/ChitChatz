@@ -20,13 +20,19 @@ class _AddFriendsState extends State<AddFriends> {
   Stream<List<Map<String, dynamic>>> _getUsersStream() {
     return _firestore.collection('users').snapshots().asyncMap((snapshot) async {
       List<Map<String, dynamic>> usersData = [];
+      final currentUserId = _auth.currentUser?.uid; // Get the current user ID
+
       for (var doc in snapshot.docs) {
         try {
           final userDoc = await _firestore.collection('users').doc(doc.id).get();
           if (userDoc.exists) {
             final data = userDoc.data() as Map<String, dynamic>;
             data['userId'] = doc.id; // Add the user ID to the data
-            usersData.add(data);
+
+            // Filter out the current user
+            if (data['userId'] != currentUserId) {
+              usersData.add(data);
+            }
           }
         } catch (e) {
           print("Error fetching details for user ${doc.id}: $e");
@@ -38,8 +44,9 @@ class _AddFriendsState extends State<AddFriends> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _auth.currentUser?.uid; // Get current user ID here
     return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       appBar: AppBar(
         title: Text(
           'Add Friends',
@@ -83,7 +90,11 @@ class _AddFriendsState extends State<AddFriends> {
             itemCount: usersData.length,
             itemBuilder: (context, index) {
               final userData = usersData[index];
-              return UserTile(userData: userData, currentUserId:currentUserId! ); 
+              return UserTile(
+                userData: userData, // Pass the user data to UserTile
+                currentUserId: currentUserId!, // Pass currentUserId
+                currentUserDisplayName: "YourDisplayName", // Replace with actual display name
+              );
             },
           );
         },

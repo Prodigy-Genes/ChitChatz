@@ -1,5 +1,3 @@
-// ignore_for_file: use_super_parameters
-
 import 'package:chatapp/model/notification.dart';
 import 'package:chatapp/services/friend_request_service.dart';
 import 'package:chatapp/services/friend_request_status.dart';
@@ -9,10 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class UserTile extends StatelessWidget {
-  final Map<String, dynamic> userData;
-  final String currentUserId;
+  final Map<String, dynamic> userData; // Receiver's data
+  final String currentUserId; // ID of the current user
+  final String currentUserDisplayName; // Display name of the current user
 
-  const UserTile({Key? key, required this.userData, required this.currentUserId}) : super(key: key);
+  const UserTile({
+    super.key,
+    required this.userData,
+    required this.currentUserId,
+    required this.currentUserDisplayName, // Pass the current user's display name
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +27,7 @@ class UserTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -142,19 +146,18 @@ class UserTile extends StatelessWidget {
                                 .sendFriendRequest(userId);
                             // Create a notification
                             final notification = NotificationModel(
-                              senderId:
-                                  currentUserId, // the ID of the user sending the request
-                              receiverId:
-                                  userId, // the ID of the user receiving the request
-                              message:
-                                  'You just sent a friend request to $username.',
+                              senderId: currentUserId,
+                              senderName: currentUserDisplayName, // Use the current user's display name
+                              receiverId: userId,
+                              receiverName: username, // Get the receiver's username
+                              message: '$currentUserDisplayName has sent you a friend request.', // Correct message
                               timestamp: DateTime.now(),
                               type: 'friend_request',
                             );
 
                             // Send the notification
                             await NotificationService()
-                                .sendNotification(notification);
+                                .sendFriendRequestNotification(notification);
                           }
                         }
                       : null,
