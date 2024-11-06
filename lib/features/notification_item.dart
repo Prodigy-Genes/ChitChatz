@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:chatapp/model/notification.dart';
 import 'package:chatapp/services/notification_service.dart';
 
-
 class NotificationItem extends StatelessWidget {
   final NotificationModel notification;
 
@@ -32,27 +31,88 @@ class NotificationItem extends StatelessWidget {
           ),
         );
       },
-      child: ListTile(
-        title: Text(
-          notification.message,
-          style: TextStyle(
-            fontWeight: notification.status == 'unread' ? FontWeight.bold : FontWeight.normal,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Card(
+          elevation: 3,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    notification.message,
+                    style: TextStyle(
+                      fontFamily: 'Kavivanar',
+                      fontSize: 16,
+                      color: Colors.black,
+                      fontWeight: notification.status == 'unread' ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${NotificationHelper.getNotificationTypeText(notification.type)} • '
+                    '${NotificationHelper.formatTimestamp(notification.timestamp)}',
+                    style: TextStyle(
+                      fontFamily: 'Kavivanar',
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: NotificationHelper.getNotificationColor(notification.type),
+                    child: Icon(
+                      NotificationHelper.getNotificationIcon(notification.type),
+                      color: Colors.white,
+                    ),
+                  ),
+                  trailing: _buildTrailing(context),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => NotificationHelper.handleNotificationAction(context, notification, 'accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.yellow[700],
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(
+                          fontFamily: 'Kavivanar',
+                          color: Colors.black,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: () => NotificationHelper.handleNotificationAction(context, notification, 'reject'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'Reject',
+                        style: TextStyle(
+                          fontFamily: 'Kavivanar',
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        subtitle: Text(
-          '${NotificationHelper.getNotificationTypeText(notification.type)} • '
-          '${NotificationHelper.formatTimestamp(notification.timestamp)}',
-          style: TextStyle(color: Colors.grey[600]),
-        ),
-        leading: CircleAvatar(
-          backgroundColor: NotificationHelper.getNotificationColor(notification.type),
-          child: Icon(
-            NotificationHelper.getNotificationIcon(notification.type),
-            color: Colors.white,
-          ),
-        ),
-        trailing: _buildTrailing(context),
-        onTap: () => NotificationHelper.handleNotificationTap(context, notification),
       ),
     );
   }
@@ -75,9 +135,18 @@ class NotificationItem extends StatelessWidget {
           itemBuilder: (BuildContext context) => [
             PopupMenuItem(
               value: notification.status == 'unread' ? 'mark_read' : 'mark_unread',
-              child: Text(notification.status == 'unread' ? 'Mark as read' : 'Mark as unread'),
+              child: Text(
+                notification.status == 'unread' ? 'Mark as read' : 'Mark as unread',
+                style: const TextStyle(fontFamily: 'Kavivanar'),
+              ),
             ),
-            const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text(
+                'Delete',
+                style: TextStyle(fontFamily: 'Kavivanar'),
+              ),
+            ),
           ],
         ),
       ],

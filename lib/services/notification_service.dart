@@ -1,3 +1,4 @@
+import 'package:chatapp/services/friend_request_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chatapp/model/notification.dart';
@@ -9,103 +10,153 @@ class NotificationService {
   final String _collectionName = 'notifications';
   final Logger _logger = Logger();
 
-  Future<String> _getSenderName(String senderId) async {
-    if (senderId.isEmpty) {
-      _logger.w('Sender ID is empty');
+  Future<String> _getUsername(String userId) async {
+    if (userId.isEmpty) {
+      _logger.w('User ID is empty');
       return 'Unknown User';
     }
 
     try {
-      final userDoc = await _firestore.collection('users').doc(senderId).get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final displayName = userDoc.data()!['displayName'];
-        if (displayName != null && displayName.isNotEmpty) {
-          return displayName;
-        } else {
-          _logger.w('Display name is null or empty for sender ID: $senderId');
-        }
-      } else {
-        _logger.w('User document does not exist for sender ID: $senderId');
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists || userDoc.data() == null) {
+        _logger.w('User document does not exist for ID: $userId');
+        return 'Unknown User';
       }
+
+      final userData = userDoc.data()!;
+      final username = userData['username'] as String?;
+
+      // Log the found data for debugging
+      _logger.d('User data for $userId: ${userData.toString()}');
+
+      if (username == null || username.isEmpty) {
+        _logger.w('Username is null or empty for user ID: $userId');
+        return 'Unknown User';
+      }
+
+      _logger.i('Found username for user $userId: $username');
+      return username;
     } catch (e) {
-      _logger.e('Error fetching sender name for ID $senderId: $e');
+      _logger.e('Error fetching username for ID $userId: $e');
+      return 'Unknown User';
     }
-    return 'Unknown User'; // Fallback
   }
 
   Future<void> sendFriendRequestNotification({
     required String receiverId,
-    required String receiverName,
+    String? receiverUsername,
     required String type,
   }) async {
     try {
       final sender = _auth.currentUser;
       if (sender == null) throw Exception('User not authenticated');
 
-      final senderName = await _getSenderName(sender.uid); // Get sender's name
-      _logger.i('Sender Name: $senderName');
+      // Log the current state for debugging
+      _logger.d('Starting notification send process:');
+      _logger.d('Sender ID: ${sender.uid}');
+      _logger.d('Receiver ID: $receiverId');
+      _logger.d('Provided Receiver Username: $receiverUsername');
+
+      // Fetch usernames
+      final senderUsername = await _getUsername(sender.uid);
+      final finalReceiverUsername =
+          receiverUsername ?? await _getUsername(receiverId);
+
+      _logger.i(
+          'Sender Username: $senderUsername, Receiver Username: $finalReceiverUsername');
 
       // Create notification for receiver
       final receiverNotification = NotificationModel(
-        id: '', // Firestore will generate this
+        id: '',
         senderId: sender.uid,
-        senderName: senderName,
+        senderName: senderUsername,
         receiverId: receiverId,
-        receiverName: receiverName,
+        receiverName: finalReceiverUsername,
         type: type,
-        message: '$senderName sent you a friend request',
+        message: '$senderUsername sent you a friend request',
         status: 'unread',
         timestamp: DateTime.now(),
       );
 
       // Create notification for sender
       final senderNotification = NotificationModel(
-        id: '', // Firestore will generate this
+        id: '',
         senderId: sender.uid,
-        senderName: senderName,
-        receiverId: sender.uid, // Sender will receive this notification
-        receiverName: senderName, // Use sender's name
+        senderName: senderUsername,
+        receiverId: sender.uid,
+        receiverName: senderUsername,
         type: 'friend_request_sent',
-        message: 'You sent a friend request to $receiverName',
-        status: 'read', // Mark as read for sender
+        message: 'You sent a friend request to $finalReceiverUsername',
+        status: 'read',
         timestamp: DateTime.now(),
       );
 
-      // Use a batch write to ensure both notifications are created atomically
       final batch = _firestore.batch();
-
-      // Create new documents with auto-generated IDs
       final receiverNotifRef = _firestore.collection(_collectionName).doc();
       final senderNotifRef = _firestore.collection(_collectionName).doc();
 
-      // Set the documents in the batch
       batch.set(receiverNotifRef, receiverNotification.toFirestore());
       batch.set(senderNotifRef, senderNotification.toFirestore());
 
-      // Commit the batch
       await batch.commit();
 
       _logger.i('Friend request notifications sent successfully');
     } catch (e) {
       _logger.e('Error sending friend request notifications: $e');
-      rethrow; // Consider rethrowing with more context if needed
+      rethrow;
     }
   }
 
-  // Rest of the methods remain the same...
   Stream<List<NotificationModel>> getNotifications(String userId) {
+    return _firestore
+        .collection(_collectionName)
+        .where('receiverId', isEqualTo: userId)
+        .where('senderId', isNotEqualTo: userId) // Add this line to exclude self-notifications
+        .orderBy('senderId') // Required for the compound query
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return NotificationModel.fromFirestore(doc);
+            })
+            .toList());
+  }
+
+  Stream<List<NotificationModel>> getAllNotifications(String userId) {
     return _firestore
         .collection(_collectionName)
         .where('receiverId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((querySnapshot) => querySnapshot.docs.map((doc) {
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) {
               final data = doc.data();
-              // Add the document ID to the data
               data['id'] = doc.id;
               return NotificationModel.fromFirestore(doc);
-            }).toList());
+            })
+            .toList());
   }
+
+   Stream<List<NotificationModel>> getSelfNotifications(String userId) {
+    return _firestore
+        .collection(_collectionName)
+        .where('receiverId', isEqualTo: userId)
+        .where('senderId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return NotificationModel.fromFirestore(doc);
+            })
+            .toList());
+  }
+
+   
+
 
   // Update notification status
   Future<void> updateNotificationStatus(
@@ -164,6 +215,85 @@ class NotificationService {
     } catch (e) {
       _logger.e('Error marking all notifications as unread: $e');
       rethrow;
+    }
+  }
+
+  // Send a reminder notification for pending friend requests older than 7 days
+  Future<void> sendPendingRequestReminder() async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    final now = DateTime.now();
+
+    try {
+      // Fetch pending friend requests older than 7 days
+      final pendingRequests = await _firestore
+          .collection('friend_requests')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .where('timestamp', isLessThan: now.subtract(const Duration(days: 7)))
+          .get();
+
+      for (var requestDoc in pendingRequests.docs) {
+        final requestId = requestDoc.id;
+        final senderId = requestDoc['senderId'];
+
+        // Check if a reminder notification has already been sent in the last 7 days
+        final recentReminder = await _firestore
+            .collection(_collectionName)
+            .where('requestId', isEqualTo: requestId)
+            .where('senderId', isEqualTo: senderId)
+            .where('receiverId', isEqualTo: currentUserId)
+            .where('type', isEqualTo: 'friend_request_reminder')
+            .where('timestamp', isGreaterThan: now.subtract(const Duration(days: 7)))
+            .get();
+
+        if (recentReminder.docs.isEmpty) {
+          // Send reminder notification
+          await sendFriendRequestNotification(
+            receiverId: currentUserId,
+            type: 'friend_request_reminder',
+          );
+          _logger.i('Sent reminder for pending friend request from $senderId');
+        }
+      }
+    } catch (e) {
+      _logger.e('Error sending reminder for pending requests: $e');
+    }
+  }
+
+  // Expire friend requests older than 30 days and notify sender
+  Future<void> expireOldFriendRequests() async {
+    final now = DateTime.now();
+
+    try {
+      // Find pending requests older than 30 days
+      final oldRequests = await _firestore
+          .collection('friend_requests')
+          .where('status', isEqualTo: 'pending')
+          .where('timestamp', isLessThan: now.subtract(const Duration(days: 30)))
+          .get();
+
+      for (var requestDoc in oldRequests.docs) {
+        final requestId = requestDoc.id;
+        final senderId = requestDoc['senderId'];
+        final receiverId = requestDoc['receiverId'];
+
+        // Mark the request as expired
+        await _firestore
+            .collection('friend_requests')
+            .doc(requestId)
+            .update({'status': FriendRequestStatus.none.toText()});
+
+        // Send a notification to the sender that the request expired
+        await sendFriendRequestNotification(
+          receiverId: senderId,
+          type: 'friend_request_expired',
+        );
+        _logger.i('Expired friend request from $senderId to $receiverId');
+      }
+    } catch (e) {
+      _logger.e('Error expiring old friend requests: $e');
     }
   }
 

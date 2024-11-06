@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class NotificationModel {
   final String? id;
   final String senderId;
-  final String senderName; // Added senderName
+  final String senderName;
   final String receiverId;
-  final String receiverName; // Added receiverName
+  final String receiverName;
   final String message;
   final DateTime timestamp;
   final String type;
@@ -15,9 +15,9 @@ class NotificationModel {
   NotificationModel({
     this.id,
     required this.senderId,
-    required this.senderName, // Added senderName
+    required this.senderName,
     required this.receiverId,
-    required this.receiverName, // Added receiverName
+    required this.receiverName,
     required this.message,
     required this.timestamp,
     required this.type,
@@ -32,13 +32,13 @@ class NotificationModel {
     final data = snapshot.data()!;
     return NotificationModel(
       id: snapshot.id,
-      senderId: data['senderId'] ?? '', // Default to empty string if null
-      senderName: data['senderName'] ?? 'Unknown User', // Default value for senderName
-      receiverId: data['receiverId'] ?? '', // Default to empty string if null
-      receiverName: data['receiverName'] ?? 'Unknown User', // Default value for receiverName
-      message: data['message'] ?? '', // Default to empty string if null
+      senderId: data['senderId'] ?? '',
+      senderName: data['senderName'] ?? 'Unknown User',
+      receiverId: data['receiverId'] ?? '',
+      receiverName: data['receiverName'] ?? 'Unknown User',
+      message: data['message'] ?? '',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      type: data['type'] ?? 'unknown', // Default to 'unknown' if null
+      type: data['type'] ?? 'unknown',
       status: data['status'] ?? 'unread',
       data: Map<String, dynamic>.from(data['data'] ?? {}),
     );
@@ -47,9 +47,9 @@ class NotificationModel {
   Map<String, dynamic> toFirestore() {
     return {
       'senderId': senderId,
-      'senderName': senderName, // Added senderName
+      'senderName': senderName,
       'receiverId': receiverId,
-      'receiverName': receiverName, // Added receiverName
+      'receiverName': receiverName,
       'message': message,
       'timestamp': FieldValue.serverTimestamp(),
       'type': type,
@@ -58,13 +58,12 @@ class NotificationModel {
     };
   }
 
-  // Create a copy of the notification with modified fields
   NotificationModel copyWith({
     String? id,
     String? senderId,
-    String? senderName, // Added senderName
+    String? senderName,
     String? receiverId,
-    String? receiverName, // Added receiverName
+    String? receiverName,
     String? message,
     DateTime? timestamp,
     String? type,
@@ -74,9 +73,9 @@ class NotificationModel {
     return NotificationModel(
       id: id ?? this.id,
       senderId: senderId ?? this.senderId,
-      senderName: senderName ?? this.senderName, // Added senderName
+      senderName: senderName ?? this.senderName,
       receiverId: receiverId ?? this.receiverId,
-      receiverName: receiverName ?? this.receiverName, // Added receiverName
+      receiverName: receiverName ?? this.receiverName,
       message: message ?? this.message,
       timestamp: timestamp ?? this.timestamp,
       type: type ?? this.type,
@@ -85,10 +84,8 @@ class NotificationModel {
     );
   }
 
-  // Helper method to check if notification is unread
   bool get isUnread => status == 'unread';
 
-  // Helper method to get formatted timestamp
   String getFormattedTimestamp() {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
@@ -106,7 +103,6 @@ class NotificationModel {
     }
   }
 
-  // Helper method to get notification type display text
   String getTypeDisplayText() {
     switch (type) {
       case 'friend_request':
@@ -119,4 +115,16 @@ class NotificationModel {
         return 'Notification';
     }
   }
+
+  // Helper method to check if the notification is related to the current user (self notification)
+  bool isSelfNotification(String currentUserId) {
+  // Check if the notification is of type 'collaboration' or any other specific type
+  if (type == 'friend_request') {
+    // If it's a collaboration notification, check both sender and receiver IDs
+    return senderId == currentUserId || receiverId == currentUserId;
+  }
+  
+  // If it's not a collaboration, check the usual senderId and receiverId logic
+  return senderId == currentUserId || receiverId == currentUserId;
+}
 }

@@ -20,7 +20,6 @@ extension FriendRequestStatusExtension on FriendRequestStatus {
   }
 }
 
-// Move fromString method to the enum
 extension FriendRequestStatusParser on String {
   FriendRequestStatus toFriendRequestStatus() {
     switch (this) {
