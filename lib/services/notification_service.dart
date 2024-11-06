@@ -42,6 +42,46 @@ class NotificationService {
     }
   }
 
+   // Method to check if a notification is a self-notification
+  bool isSelfNotification(String senderId, String receiverId) {
+    return senderId == receiverId;
+  }
+
+  // Example usage in getNotifications
+  Stream<List<NotificationModel>> getNotifications(String userId) {
+    return _firestore
+        .collection(_collectionName)
+        .where('receiverId', isEqualTo: userId)
+        .where('senderId', isNotEqualTo: userId) // Exclude self-notifications
+        .orderBy('senderId') // Required for compound query
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return NotificationModel.fromFirestore(doc);
+            })
+            .toList());
+  }
+
+  Stream<List<NotificationModel>> getSelfNotifications(String userId) {
+    return _firestore
+        .collection(_collectionName)
+        .where('receiverId', isEqualTo: userId)
+        .where('senderId', isEqualTo: userId) // Only self-notifications
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return NotificationModel.fromFirestore(doc);
+            })
+            .toList());
+  }
+
+  // Modify sendFriendRequestNotification to use the isSelfNotification method
   Future<void> sendFriendRequestNotification({
     required String receiverId,
     String? receiverUsername,
@@ -51,21 +91,10 @@ class NotificationService {
       final sender = _auth.currentUser;
       if (sender == null) throw Exception('User not authenticated');
 
-      // Log the current state for debugging
-      _logger.d('Starting notification send process:');
-      _logger.d('Sender ID: ${sender.uid}');
-      _logger.d('Receiver ID: $receiverId');
-      _logger.d('Provided Receiver Username: $receiverUsername');
-
-      // Fetch usernames
       final senderUsername = await _getUsername(sender.uid);
       final finalReceiverUsername =
           receiverUsername ?? await _getUsername(receiverId);
 
-      _logger.i(
-          'Sender Username: $senderUsername, Receiver Username: $finalReceiverUsername');
-
-      // Create notification for receiver
       final receiverNotification = NotificationModel(
         id: '',
         senderId: sender.uid,
@@ -78,7 +107,6 @@ class NotificationService {
         timestamp: DateTime.now(),
       );
 
-      // Create notification for sender
       final senderNotification = NotificationModel(
         id: '',
         senderId: sender.uid,
@@ -106,57 +134,6 @@ class NotificationService {
       rethrow;
     }
   }
-
-  Stream<List<NotificationModel>> getNotifications(String userId) {
-    return _firestore
-        .collection(_collectionName)
-        .where('receiverId', isEqualTo: userId)
-        .where('senderId', isNotEqualTo: userId) // Add this line to exclude self-notifications
-        .orderBy('senderId') // Required for the compound query
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((querySnapshot) => querySnapshot.docs
-            .map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              return NotificationModel.fromFirestore(doc);
-            })
-            .toList());
-  }
-
-  Stream<List<NotificationModel>> getAllNotifications(String userId) {
-    return _firestore
-        .collection(_collectionName)
-        .where('receiverId', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((querySnapshot) => querySnapshot.docs
-            .map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              return NotificationModel.fromFirestore(doc);
-            })
-            .toList());
-  }
-
-   Stream<List<NotificationModel>> getSelfNotifications(String userId) {
-    return _firestore
-        .collection(_collectionName)
-        .where('receiverId', isEqualTo: userId)
-        .where('senderId', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((querySnapshot) => querySnapshot.docs
-            .map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              return NotificationModel.fromFirestore(doc);
-            })
-            .toList());
-  }
-
-   
-
 
   // Update notification status
   Future<void> updateNotificationStatus(

@@ -91,15 +91,30 @@ class FriendRequestService {
     }
   }
 
-  Future<void> addFriend(String senderId, String receiverId) async {
+   Future<void> addFriend(String senderId, String receiverId) async {
     try {
       final friendDocId = senderId.compareTo(receiverId) < 0
           ? '${senderId}_$receiverId'
           : '${receiverId}_$senderId';
 
+      // Fetch sender and receiver user data
+      final senderDoc = await _firestore.collection('users').doc(senderId).get();
+      final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
+
+      if (!senderDoc.exists || !receiverDoc.exists) {
+        throw Exception('User data not found');
+      }
+
+      final senderData = senderDoc.data() as Map<String, dynamic>;
+      final receiverData = receiverDoc.data() as Map<String, dynamic>;
+
+      final senderUsername = senderData['username'] ?? 'Unknown User';
+      final receiverUsername = receiverData['username'] ?? 'Unknown User';
+
       // Update friends collection
       await _firestore.collection('friends').doc(friendDocId).set({
         'users': [senderId, receiverId],
+        'usernames': [senderUsername, receiverUsername],
         'timestamp': FieldValue.serverTimestamp(),
       });
 

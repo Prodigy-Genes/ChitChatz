@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:chatapp/model/notification.dart';
 import 'package:chatapp/services/notification_service.dart';
+import 'package:chatapp/services/friend_request_service.dart';
+import 'package:logger/logger.dart';
 
 class NotificationHelper {
+  static final FriendRequestService _friendRequestService = FriendRequestService();
+  static final Logger logger = Logger();
+
   static String getNotificationTypeText(String type) {
     switch (type) {
       case 'friend_request':
@@ -64,7 +69,7 @@ class NotificationHelper {
   }
 
   static void handleNotificationAction(
-      BuildContext context, NotificationModel notification, String action) {
+      BuildContext context, NotificationModel notification, String action) async {
     switch (action) {
       case 'mark_read':
         NotificationService().markAllNotificationsAsRead(notification.id!);
@@ -74,6 +79,25 @@ class NotificationHelper {
         break;
       case 'delete':
         NotificationService().deleteNotification(notification.id!);
+        break;
+      case 'accept':
+        try {
+          await _friendRequestService.addFriend(notification.senderId, notification.receiverId);
+          logger.i("Friend request accepted from ${notification.senderId}");
+        } catch (e) {
+          logger.e("Failed to accept friend request: $e");
+        }
+        break;
+      case 'reject':
+        try {
+          await _friendRequestService.rejectFriendRequest(notification.senderId, notification.receiverId);
+          logger.i("Friend request rejected from ${notification.senderId}");
+        } catch (e) {
+          logger.e("Failed to reject friend request: $e");
+        }
+        break;
+      default:
+        logger.w("Unhandled notification action: $action");
         break;
     }
   }

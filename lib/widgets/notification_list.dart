@@ -66,7 +66,7 @@ class NotificationList extends StatelessWidget {
       stream: NotificationService().getSelfNotifications(currentUserId),
       builder: (context, snapshot) {
         return _buildNotificationContent(
-          context, 
+          context,
           snapshot,
           emptyMessage: 'No activity yet',
           emptyIcon: Icons.history,
@@ -76,53 +76,57 @@ class NotificationList extends StatelessWidget {
   }
 
   Widget _buildNotificationContent(
-  BuildContext context,
-  AsyncSnapshot<List<NotificationModel>> snapshot, {
-  String emptyMessage = 'No notifications yet',
-  IconData emptyIcon = Icons.notifications_off,
-}) {
-  if (snapshot.hasError) {
-    return _buildErrorContent(context, snapshot.error.toString());
-  }
+    BuildContext context,
+    AsyncSnapshot<List<NotificationModel>> snapshot, {
+    String emptyMessage = 'No notifications yet',
+    IconData emptyIcon = Icons.notifications_off,
+  }) {
+    if (snapshot.hasError) {
+      return _buildErrorContent(context, snapshot.error.toString());
+    }
 
-  if (!snapshot.hasData) {
-    return const Center(
-      child: CircularProgressIndicator(),
+    if (!snapshot.hasData) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    final notifications = snapshot.data!;
+    if (notifications.isEmpty) {
+      return _buildEmptyContent(message: emptyMessage, icon: emptyIcon);
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        (context as Element).markNeedsBuild();
+      },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: notifications.length,
+        itemBuilder: (context, index) {
+          final notification = notifications[index];
+          final bool isSelfNotification = NotificationService()
+              .isSelfNotification(
+                  notification.senderId, notification.receiverId);
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 4,
+              child: isSelfNotification
+                  ? SelfNotificationItem(
+                      notification: notification,
+                    ) // Display self-notification
+                  : CollaborativeNotificationItem(notification: notification),
+            ),
+          );
+        },
+      ),
     );
   }
-
-  final notifications = snapshot.data!;
-  if (notifications.isEmpty) {
-    return _buildEmptyContent(message: emptyMessage, icon: emptyIcon);
-  }
-
-  return RefreshIndicator(
-    onRefresh: () async {
-      (context as Element).markNeedsBuild();
-    },
-    child: ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: notifications.length,
-      itemBuilder: (context, index) {
-        final notification = notifications[index];
-        bool isSelfNotification = notification.isSelfNotification(currentUserId);
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 4,
-            child: isSelfNotification
-                ? SelfNotificationItem(notification: notification,) // Display self-notification
-                : CollaborativeNotificationItem(notification: notification),
-          ),
-        );
-      },
-    ),
-  );
-}
 
   Widget _buildErrorContent(BuildContext context, String error) {
     return Center(

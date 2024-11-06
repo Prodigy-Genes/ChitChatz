@@ -116,15 +116,4 @@ class NotificationModel {
     }
   }
 
-  // Helper method to check if the notification is related to the current user (self notification)
-  bool isSelfNotification(String currentUserId) {
-  // Check if the notification is of type 'collaboration' or any other specific type
-  if (type == 'friend_request') {
-    // If it's a collaboration notification, check both sender and receiver IDs
-    return senderId == currentUserId || receiverId == currentUserId;
-  }
-  
-  // If it's not a collaboration, check the usual senderId and receiverId logic
-  return senderId == currentUserId || receiverId == currentUserId;
-}
 }
