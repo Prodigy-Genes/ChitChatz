@@ -26,7 +26,7 @@ class UserModel {
       username: data['username'] ?? '',
       email: data['email'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
-      profilePictureUrl: data['profilePicture'] ?? '',
+      profilePictureUrl: data['profilePictureUrl'] ?? '',
       isUserOnline: data['isUserOnline'] ?? false,
       isEmailVerified: data['isEmailVerified'] ?? false, 
     );
@@ -51,7 +51,7 @@ class UserModel {
       username: map['username'] ?? '',
       email: map['email'] ?? '',
       createdAt: (map['createdAt'] as Timestamp).toDate(),
-      profilePictureUrl: map['profilePicture'] ?? '',
+      profilePictureUrl: map['profilePictureUrl'] ?? '',
       isUserOnline: map['isUserOnline'] ?? false,
       isEmailVerified: map['isEmailVerified'] ?? false, 
     );

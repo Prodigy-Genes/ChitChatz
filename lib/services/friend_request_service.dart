@@ -1,3 +1,4 @@
+import 'package:chatapp/model/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
@@ -31,7 +32,30 @@ class FriendRequestService {
       for (var snapshot in requests) {
         if (snapshot.docs.isNotEmpty) {
           final status = snapshot.docs.first.data()['status'] as String;
-          return status.toFriendRequestStatus();
+          final friendRequestStatus = status.toFriendRequestStatus();
+
+          // If the status is accepted or rejected, update related notification status
+          if (friendRequestStatus == FriendRequestStatus.accepted ||
+              friendRequestStatus == FriendRequestStatus.rejected) {
+            // Get the related notification
+            final notificationQuery = await _firestore
+                .collection('notifications')
+                .where('senderId',
+                    isEqualTo: snapshot.docs.first.data()['senderId'])
+                .where('receiverId',
+                    isEqualTo: snapshot.docs.first.data()['receiverId'])
+                .where('type', isEqualTo: 'friend_request')
+                .get();
+
+            // Update notification status to read
+            if (notificationQuery.docs.isNotEmpty) {
+              for (var notifDoc in notificationQuery.docs) {
+                await notifDoc.reference.update({'status': 'read'});
+              }
+            }
+          }
+
+          return friendRequestStatus;
         }
       }
       return FriendRequestStatus.none;
@@ -91,15 +115,17 @@ class FriendRequestService {
     }
   }
 
-   Future<void> addFriend(String senderId, String receiverId) async {
+  Future<void> addFriend(String senderId, String receiverId) async {
     try {
       final friendDocId = senderId.compareTo(receiverId) < 0
           ? '${senderId}_$receiverId'
           : '${receiverId}_$senderId';
 
       // Fetch sender and receiver user data
-      final senderDoc = await _firestore.collection('users').doc(senderId).get();
-      final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
+      final senderDoc =
+          await _firestore.collection('users').doc(senderId).get();
+      final receiverDoc =
+          await _firestore.collection('users').doc(receiverId).get();
 
       if (!senderDoc.exists || !receiverDoc.exists) {
         throw Exception('User data not found');
@@ -157,16 +183,36 @@ class FriendRequestService {
     }
   }
 
-  Stream<List<String>> getFriends(String userId) {
-    return _firestore
-        .collection('friends')
-        .where('users', arrayContains: userId)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.expand((doc) {
-        final users = List<String>.from(doc.data()['users'] ?? []);
-        return users.where((id) => id != userId);
-      }).toList();
-    });
-  }
+  Stream<List<UserModel>> getFriends(String userId) {
+  return _firestore
+      .collection('friends')
+      .where('users', arrayContains: userId)
+      .snapshots()
+      .asyncMap((snapshot) async {
+    List<UserModel> friends = [];
+
+    for (var doc in snapshot.docs) {
+      // Get the user IDs array from the 'friends' document
+      final users = List<String>.from(doc.data()['users'] ?? []);
+
+      // Find the index of the current user in the users array
+      final currentUserIndex = users.indexOf(userId);
+      if (currentUserIndex != -1 && users.length > 1) {
+        // Get the other user's ID (if currentUser is at index 0, get index 1, and vice versa)
+        final friendUserId = users[1 - currentUserIndex];
+
+        // Fetch user details from Firestore
+        final userDoc = await _firestore.collection('users').doc(friendUserId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final friend = UserModel.fromDocumentSnapshot(userData, friendUserId);
+          friends.add(friend);
+        }
+      }
+    }
+
+    return friends;
+  });
+}
+
 }
