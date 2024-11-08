@@ -1,7 +1,6 @@
-// inchat_input_widget.dart
+// ignore_for_file: library_private_types_in_public_api, avoid_print
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'emoji_button.dart';
 import 'voice_note_button.dart';
 import 'send_button.dart';
@@ -17,23 +16,40 @@ class InchatInputWidget extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
   _InchatInputWidgetState createState() => _InchatInputWidgetState();
 }
 
 class _InchatInputWidgetState extends State<InchatInputWidget> {
   final TextEditingController _controller = TextEditingController();
   bool _isTextEmpty = true;
+  bool _isSending = false;
 
-  void _handleSendMessage() {
+  // Handle sending message
+  void _handleSendMessage() async {
     if (_controller.text.isNotEmpty) {
+      setState(() {
+        _isSending = true; // Start sending state
+      });
+
+      // Call the parent widget's send message function
       widget.onSendMessage(_controller.text);
-      _controller.clear();
+
+      // Simulate message sending delay (could be replaced with actual sending logic)
+      await Future.delayed(const Duration(seconds: 1)); 
+
+      // After message is sent, clear the input and reset the state
+      setState(() {
+        _isSending = false; // Reset sending state
+      });
+
+      _controller.clear(); // Clear the text field
     }
   }
 
-  void _handleVoiceNote() {
-    widget.onVoiceNote();
+  void _onRecordingComplete(String recordingPath, int duration) {
+    // Handle completed recording (send the path and duration to the parent or upload)
+    print('Recording completed: $recordingPath, Duration: $duration');
+    widget.onVoiceNote(); // Call the parent function to handle the voice note if needed
   }
 
   @override
@@ -53,40 +69,15 @@ class _InchatInputWidgetState extends State<InchatInputWidget> {
       child: Row(
         children: [
           const EmojiButton(),
-          // Text Area for typing messages
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle:
-                    GoogleFonts.nunito(fontSize: 14, color: Colors.grey[600]),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(color: Colors.transparent),
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              ),
-              onChanged: (text) {
-                setState(() {
-                  _isTextEmpty = text.isEmpty;
-                });
-              },
-            ),
-          ),
           const SizedBox(width: 8),
           // Voice Note Button (Imported Widget)
-          VoiceNoteButton(
-            onPressed: _handleVoiceNote,
-          ),
+          VoiceNoteButton(onRecordingComplete: _onRecordingComplete),
           const SizedBox(width: 8),
           // Send Button (Imported Widget)
           SendButton(
             onPressed: _handleSendMessage,
             isTextEmpty: _isTextEmpty,
+            isSending: _isSending, // Pass the sending state to show loading spinner
           ),
         ],
       ),

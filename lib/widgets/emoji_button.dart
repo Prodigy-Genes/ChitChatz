@@ -1,8 +1,9 @@
+// emoji_button.dart
 // ignore_for_file: library_private_types_in_public_api, avoid_print
 
+import 'package:chatapp/widgets/textfieldwidget.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' hide Category;
 
 class EmojiButton extends StatefulWidget {
   const EmojiButton({super.key});
@@ -11,73 +12,118 @@ class EmojiButton extends StatefulWidget {
   _EmojiButtonState createState() => _EmojiButtonState();
 }
 
-class _EmojiButtonState extends State<EmojiButton> {
+class _EmojiButtonState extends State<EmojiButton> with SingleTickerProviderStateMixin {
   TextEditingController textEditingController = TextEditingController();
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  bool _isEmojiPickerVisible = false;
 
-  void _openEmojiPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return EmojiPicker(
-          onEmojiSelected: (Category? category, Emoji? emoji) {
-            if (emoji != null) {
-              // Safely print emoji
-              print(emoji.emoji);
-              // Here, you can also insert the emoji into your input field
-              textEditingController.text += emoji.emoji;
-            }
-          },
-          onBackspacePressed: () {
-            // Optional: Handle backspace press
-          },
-          textEditingController: textEditingController,
-          config: Config(
-            height: 200,  // Reduced height of the emoji picker
-            checkPlatformCompatibility: true,
-            emojiViewConfig: EmojiViewConfig(
-              emojiSizeMax: 24 * (defaultTargetPlatform == TargetPlatform.iOS ? 1.20 : 1.0),  // Reduced emoji size
-            ),
-            viewOrderConfig: const ViewOrderConfig(
-              top: EmojiPickerItem.categoryBar,
-              middle: EmojiPickerItem.emojiView,
-              bottom: EmojiPickerItem.searchBar,
-            ),
-            skinToneConfig: const SkinToneConfig(),
-            categoryViewConfig: const CategoryViewConfig(),
-            bottomActionBarConfig: const BottomActionBarConfig(),
-            searchViewConfig: const SearchViewConfig(),
-          ),
-        );
-      },
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _openEmojiPicker(context),
-      borderRadius: BorderRadius.circular(20),  // Smaller corner radius
-      child: Ink(
-        decoration: BoxDecoration(
-          color: Colors.yellow,
-          borderRadius: BorderRadius.circular(20),  // Adjusted to match the smaller button size
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),  // Lighter shadow for subtle effect
-              offset: const Offset(0, 3),
-              blurRadius: 4,
-            ),
-          ],
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(8.0),  // Reduced padding for a smaller button
-          child: Icon(
-            Icons.insert_emoticon,
-            color: Colors.white,
-            size: 24,  // Reduced icon size for a less cartoony effect
+  void dispose() {
+    _animationController.dispose();
+    textEditingController.dispose();
+    super.dispose();
+  }
+
+  void _openEmojiPicker(BuildContext context) {
+    setState(() => _isEmojiPickerVisible = true);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.4,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFF3E0),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, -2),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
+          child: Column(
+            children: [
+              Container(
+                height: 5,
+                width: 40,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              Expanded(
+                child: EmojiPicker(
+                  onEmojiSelected: (Category? category, Emoji? emoji) {
+                    if (emoji != null) {
+                      setState(() {
+                        textEditingController.text += emoji.emoji;
+                      });
+                      _animationController.forward().then((_) {
+                        _animationController.reverse();
+                      });
+                    }
+                  },
+                  onBackspacePressed: () {
+                    if (textEditingController.text.isNotEmpty) {
+                      final text = textEditingController.text;
+                      textEditingController.text = text.substring(0, text.length - 2);
+                    }
+                  },
+                  textEditingController: textEditingController,
+                  config: Config(
+                    height: MediaQuery.of(context).size.height * 0.35,
+                    checkPlatformCompatibility: true,
+                    emojiViewConfig: const EmojiViewConfig(
+                      emojiSizeMax: 32,
+                      backgroundColor: Color(0xFFFFF3E0),
+                    ),
+                    categoryViewConfig: const CategoryViewConfig(
+                      backgroundColor: Colors.transparent,
+                      indicatorColor: Colors.orange,
+                      iconColorSelected: Colors.orange,
+                      tabIndicatorAnimDuration: Duration(milliseconds: 300),
+                    ),
+                    searchViewConfig: const SearchViewConfig(
+                      backgroundColor: Colors.white70,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ).whenComplete(() {
+      setState(() => _isEmojiPickerVisible = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(child: CustomTextField(
+      textEditingController: textEditingController,
+      animationController: _animationController,
+      scaleAnimation: _scaleAnimation,
+      isEmojiPickerVisible: _isEmojiPickerVisible,
+      onEmojiButtonPressed: () => _openEmojiPicker(context),
+    )
+    ,) ;
   }
 }
