@@ -1,7 +1,7 @@
 // friend_list_item_widget.dart
 // ignore_for_file: avoid_print
 
-import 'package:chatapp/screens/in_chat_screen.dart';
+import 'package:chatapp/screens/chatscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:chatapp/model/user.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -34,13 +34,11 @@ class FriendListItemWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: () {
             print('Opening chat with: ${friend.username}');
-             // Navigate to InChatScreen on tap
+            // Navigate to InChatScreen on tap
             Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => InChatScreen(friend: friend),
-              ),
-            );
+                context,
+                MaterialPageRoute(
+                    builder: (context) => ChatScreen(friend: friend)));
           },
           child: Padding(
             padding: const EdgeInsets.all(12),

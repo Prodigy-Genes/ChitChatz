@@ -1,120 +1,280 @@
-// ignore_for_file: avoid_print
-
 import 'package:chatapp/model/message.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_storage/firebase_storage.dart'; // Firebase Storage import commented out
-import 'dart:io';
-import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:logger/logger.dart';
 
-class MessageService {
+class MessagingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // final FirebaseStorage _storage = FirebaseStorage.instance; // FirebaseStorage instance commented out
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final Logger logger = Logger();
 
-  // Generate a unique chat ID for two users
   String generateChatId(String userId1, String userId2) {
     return userId1.compareTo(userId2) < 0
         ? '${userId1}_$userId2'
         : '${userId2}_$userId1';
   }
 
-  // Send a new message
-  Future<String> sendMessage(Message message) async {
-    try {
-      final chatId = generateChatId(message.senderId, message.receiverId!);
+  Future<void> sendMessage({
+  required String receiverId,
+  required String content,
+  MessageStatus status = MessageStatus.sent,
+  MessageType type = MessageType.text,
+}) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw Exception('No user logged in');
 
-      // Create message document
-      final docRef = await _firestore.collection('messages').add({
-        ...message.toMap(),
-        'chatId': chatId,
-      });
+    final chatId = generateChatId(currentUser.uid, receiverId);
+    final messageId = _firestore.collection('messages').doc().id;
+    final timestamp = FieldValue.serverTimestamp();
 
-      // Update chat metadata
-      await _updateChatMetadata(chatId, message);
+    final message = MessageModel(
+      messageId: messageId,
+      senderId: currentUser.uid,
+      receiverId: receiverId,
+      content: content,
+      timestamp: DateTime.now(),
+      status: status,
+      type: type,
+      isDeleted: false, // Explicitly set isDeleted
+    );
 
-      return docRef.id;
-    } catch (e) {
-      throw Exception("Failed to send message: $e");
-    }
-  }
+    // Ensure the message has all required fields
+    final messageMap = message.toMap();
+    messageMap['timestamp'] = timestamp; // Use server timestamp
 
-  // Upload media to Firebase Storage and get the URL
-  // Future<String> uploadMedia(File file, String path) async { 
-  //   try {
-  //     final uploadTask = _storage.ref(path).putFile(file);
-  //     final snapshot = await uploadTask;
-  //     return await snapshot.ref.getDownloadURL();
-  //   } catch (e) {
-  //     throw Exception("Failed to upload media: $e");
-  //   }
-  // }
-
-  // Get messages in a chat
-  Stream<List<Message>> getMessages(String chatId, {int limit = 50}) {
-    return _firestore
+    // Update messages collection
+    await _firestore
+        .collection('chats')
+        .doc(chatId)
         .collection('messages')
-        .where('chatId', isEqualTo: chatId)
-        .orderBy('timestamp')
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        const senderUsername = ''; // Fetch from your users collection
-        const receiverUsername = ''; // Fetch from your users collection
-        return Message.fromFirestore(doc, senderUsername, receiverUsername);
-      }).toList();
-    });
-  }
+        .doc(messageId)
+        .set(messageMap);
 
-  // Update chat metadata when a message is sent
-  Future<void> _updateChatMetadata(String chatId, Message message) async {
-    final chatRef = _firestore.collection('chats').doc(chatId);
-    await chatRef.update({
-      'lastMessage': message.content,
-      'lastMessageTimestamp': message.timestamp,
-      'senderId': message.senderId,
-    });
-  }
+    // Update chat room with last message
+    await _firestore.collection('chats').doc(chatId).set({
+      'lastMessageTime': timestamp,
+      'lastMessageContent': content,
+      'lastMessageSenderId': currentUser.uid,
+      'lastMessageStatus': MessageStatus.sent.toString(),
+      'users': [currentUser.uid, receiverId], // Add users to chat document
+    }, SetOptions(merge: true));
 
-  // Function to get the number of unread messages for a user
-  Future<int> getUnreadMessages(String userId) async {
+  } catch (e) {
+    logger.e('Error sending message: $e');
+    rethrow;
+  }
+}
+
+  Future<void> deleteMessage(String chatId, String messageId) async {
     try {
-      // Fetch messages where the user is the receiver and the 'read' field is false
-      QuerySnapshot querySnapshot = await _firestore
-          .collection('messages') // Assume messages are stored in 'messages' collection
-          .where('receiverId', isEqualTo: userId) // The user is the receiver
-          .where('read', isEqualTo: false) // Unread messages
-          .get();
-
-      return querySnapshot.docs.length; // Return the count of unread messages
+      await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .update({'isDeleted': true});
     } catch (e) {
-      print("Error fetching unread messages: $e");
-      return 0; // Return 0 in case of error
+      logger.e('Error deleting message: $e');
+      rethrow;
     }
   }
 
-  // Function to get the number of friends with new messages
-  Future<int> getFriendsWithNewMessages(String userId) async {
+  Future<void> updateMessageStatusToDelivered(String chatId) async {
     try {
-      // Fetch messages where the user is the receiver and the 'read' field is false
-      QuerySnapshot querySnapshot = await _firestore
-          .collection('messages') // Messages collection
-          .where('receiverId', isEqualTo: userId) // The user is the receiver
-          .where('read', isEqualTo: false) // Unread messages
+      // Get current user ID (the receiver)
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      
+      // Query for messages sent to the current user that are still in 'sent' status
+      final messagesQuery = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('status', isEqualTo: MessageStatus.sent.toString())
           .get();
 
-      // Create a set to track unique sender IDs (friends who have sent unread messages)
-      Set<String> friendsWithNewMessages = {};
+      // Create a batch to update multiple documents efficiently
+      WriteBatch batch = _firestore.batch();
 
-      // Iterate through the messages to find the senders
-      for (var doc in querySnapshot.docs) {
-        String senderId = doc['senderId']; // Get the senderId of the message
-        friendsWithNewMessages.add(senderId); // Add the sender to the set
+      // Update each message's status
+      for (var doc in messagesQuery.docs) {
+        batch.update(doc.reference, {
+          'status': MessageStatus.delivered.toString(),
+        });
       }
 
-      return friendsWithNewMessages.length; // Return the count of friends with unread messages
+      // Commit the batch update
+      await batch.commit();
     } catch (e) {
-      print("Error fetching friends with new messages: $e");
-      return 0; // Return 0 in case of error
+      print('Error updating message status to delivered: $e');
+    }
+  }
+
+  // Method to update message status to read
+  Future<void> updateMessageStatusToRead(String chatId) async {
+    try {
+      // Get current user ID (the receiver)
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      
+      // Query for messages sent to the current user that are in 'sent' or 'delivered' status
+      final messagesQuery = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('status', whereIn: [
+            MessageStatus.sent.toString(), 
+            MessageStatus.delivered.toString()
+          ])
+          .get();
+
+      // Create a batch to update multiple documents efficiently
+      WriteBatch batch = _firestore.batch();
+
+      // Update each message's status
+      for (var doc in messagesQuery.docs) {
+        batch.update(doc.reference, {
+          'status': MessageStatus.read.toString(),
+        });
+      }
+
+      // Commit the batch update
+      await batch.commit();
+    } catch (e) {
+      print('Error updating message status to read: $e');
+    }
+  }
+
+
+  // Method to bulk update unread messages to delivered
+  Future<void> markUnreadMessagesAsDelivered(String chatId) async {
+    try {
+      // Get all unread messages in the chat
+      QuerySnapshot unreadMessages = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('status', isEqualTo: MessageStatus.sent.toString())
+          .where('receiverId', isEqualTo: _auth.currentUser!.uid)
+          .get();
+
+      // Batch update to improve performance
+      WriteBatch batch = _firestore.batch();
+
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {
+          'status': MessageStatus.delivered.toString(),
+        });
+      }
+
+      await batch.commit();
+
+      // Update the last message status in the chat room if applicable
+      if (unreadMessages.docs.isNotEmpty) {
+        await _firestore.collection('chats').doc(chatId).update({
+          'lastMessageStatus': MessageStatus.delivered.toString(),
+        });
+      }
+    } catch (e) {
+      print('Error marking unread messages as delivered: $e');
+    }
+  }
+
+   Future<void> markAllMessagesAsRead(String chatId) async {
+    try {
+      // Get all unread and delivered messages in the chat
+      QuerySnapshot unreadMessages = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('status', whereIn: [
+            MessageStatus.sent.toString(),
+            MessageStatus.delivered.toString()
+          ])
+          .where('receiverId', isEqualTo: _auth.currentUser!.uid)
+          .get();
+
+      // Batch update to improve performance
+      WriteBatch batch = _firestore.batch();
+
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {
+          'status': MessageStatus.read.toString(),
+        });
+      }
+
+      await batch.commit();
+
+      // Update the last message status in the chat room if applicable
+      if (unreadMessages.docs.isNotEmpty) {
+        await _firestore.collection('chats').doc(chatId).update({
+          'lastMessageStatus': MessageStatus.read.toString(),
+        });
+      }
+    } catch (e) {
+      print('Error marking messages as read: $e');
+    }
+  }
+
+
+  Future<void> markAllAsRead(String chatId, String senderId) async {
+    try {
+      final messages = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('senderId', isEqualTo: senderId)
+          .where('status', isNotEqualTo: MessageStatus.read.toString())
+          .get();
+
+      final batch = _firestore.batch();
+      for (var doc in messages.docs) {
+        batch.update(doc.reference, {'status': MessageStatus.read.toString()});
+      }
+      await batch.commit();
+    } catch (e) {
+      logger.e('Error marking messages as read: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<MessageModel>> getMessages(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => MessageModel.fromMap(doc.data()))
+          .toList();
+    });
+  }
+
+  Stream<ChatRoom?> getChatRoom(String chatId) {
+    return _firestore.collection('chats').doc(chatId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return ChatRoom.fromMap(doc.data()!);
+    });
+  }
+
+  Future<void> updateMessageStatus({
+    required String chatId,
+    required String messageId,
+    required MessageStatus status,
+  }) async {
+    try {
+      await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .update({'status': status.toString()});
+    } catch (e) {
+      logger.e('Error updating message status: $e');
+      rethrow;
     }
   }
 }

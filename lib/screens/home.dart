@@ -5,7 +5,6 @@ import 'package:chatapp/widgets/user_info.dart';
 import 'package:flutter/material.dart';
 import 'package:chatapp/services/friend_request_service.dart';
 import 'package:chatapp/model/user.dart';
-import 'package:chatapp/services/message_service.dart'; // Service to fetch last messages
 
 class Home extends StatefulWidget {
   final String userId;
@@ -16,25 +15,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  int unreadMessageCount = 0; // Track total unread messages
-  int friendsWithNewMessages = 0; // Track how many friends have new messages
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUnreadMessages();
-  }
-
-  // Function to get unread messages count and friends with new messages
-  void _fetchUnreadMessages() async {
-    final unreadMessages = await MessageService().getUnreadMessages(widget.userId);
-    final friendsWithMessages = await MessageService().getFriendsWithNewMessages(widget.userId);
-
-    setState(() {
-      unreadMessageCount = unreadMessages;
-      friendsWithNewMessages = friendsWithMessages;
-    });
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -55,39 +36,7 @@ class _HomeState extends State<Home> {
             padding: const EdgeInsets.only(right: 20),
             child: UserInfo(userId: widget.userId),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 20),
-            child: Stack(
-              children: [
-                const Icon(Icons.chat, color: Colors.white),
-                if (unreadMessageCount > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        unreadMessageCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          
         ],
       ),
       body: StreamBuilder<List<UserModel>>(
