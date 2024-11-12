@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 void main() async {
   await dotenv.load(fileName: 'assets/.env');
@@ -32,9 +33,9 @@ void main() async {
     logger.e("Error initializing Firebase: $e");
     return;
   }
-
-  
-
+  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+  OneSignal.initialize(dotenv.env['ONESIGNAL_APPID']??'');
+  OneSignal.Notifications.requestPermission(true);
   runApp(const ChatApp());
 }
 

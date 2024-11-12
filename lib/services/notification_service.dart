@@ -1,14 +1,52 @@
+import 'dart:convert';
+
 import 'package:chatapp/services/friend_request_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chatapp/model/notification.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
+import 'package:http/http.dart' as http; 
 
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collectionName = 'notifications';
   final Logger _logger = Logger();
+  final String oneSignalAppId = dotenv.env['ONESIGNAL_APPID']??'';
+  final String oneSignalRestApiKey = dotenv.env['ONESIGNAL_APIKEY']??'';
+
+  Future<void> sendPushNotification({
+    required String receiverId,
+    required String message,
+  }) async {
+    const url = 'https://onesignal.com/api/v1/notifications';
+    
+    final headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Authorization': 'Basic $oneSignalRestApiKey',
+    };
+
+    final body = jsonEncode({
+      'app_id': oneSignalAppId,
+      'include_external_user_ids': [receiverId],
+      'contents': {'en': message},
+      'headings': {'en': 'Friend Request'},
+    });
+
+    try {
+      final response = await http.post(Uri.parse(url), headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        _logger.i('Push notification sent successfully: ${response.body}');
+      } else {
+        _logger.e('Failed to send push notification: ${response.body}');
+      }
+    } catch (e) {
+      _logger.e('Error sending push notification: $e');
+    }
+  }
+  
 
   Future<String> _getUsername(String userId) async {
     if (userId.isEmpty) {
@@ -127,6 +165,12 @@ class NotificationService {
       batch.set(senderNotifRef, senderNotification.toFirestore());
 
       await batch.commit();
+
+       // Send push notification
+      await sendPushNotification(
+        receiverId: receiverId,
+        message: '$senderUsername sent you a friend request!',
+      );
 
       _logger.i('Friend request notifications sent successfully');
     } catch (e) {

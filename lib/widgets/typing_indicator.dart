@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({super.key});
+  final bool isTyping; // Add this parameter
+
+  const TypingIndicator({
+    super.key, 
+    this.isTyping = false, // Default to false
+  });
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -28,6 +33,11 @@ class _TypingIndicatorState extends State<TypingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    // Only show the indicator if isTyping is true
+    if (!widget.isTyping) {
+      return const SizedBox.shrink(); // Hide completely when not typing
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(

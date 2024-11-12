@@ -1,18 +1,58 @@
+import 'dart:convert';
+
 import 'package:chatapp/model/message.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
+import 'package:http/http.dart' as http; 
+
 
 class MessagingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Logger logger = Logger();
+  final String oneSignalAppId = dotenv.env['ONESIGNAL_APPID']??'';
+  final String oneSignalRestApiKey = dotenv.env['ONESIGNAL_APIKEY']??'';
 
   String generateChatId(String userId1, String userId2) {
     return userId1.compareTo(userId2) < 0
         ? '${userId1}_$userId2'
         : '${userId2}_$userId1';
   }
+
+  // Method to send push notification
+  Future<void> sendPushNotification({
+    required String receiverId,
+    required String message,
+  }) async {
+    const url = 'https://onesignal.com/api/v1/notifications';
+    
+    final headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Authorization': 'Basic $oneSignalRestApiKey',
+    };
+
+    final body = jsonEncode({
+      'app_id': oneSignalAppId,
+      'include_external_user_ids': [receiverId],
+      'contents': {'en': message},
+      'headings': {'en': 'New Message'},
+    });
+
+    try {
+      final response = await http.post(Uri.parse(url), headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        logger.i('Push notification sent successfully: ${response.body}');
+      } else {
+        logger.e('Failed to send push notification: ${response.body}');
+      }
+    } catch (e) {
+      logger.e('Error sending push notification: $e');
+    }
+  }
+
 
   Future<void> sendMessage({
   required String receiverId,
@@ -59,6 +99,12 @@ class MessagingService {
       'lastMessageStatus': MessageStatus.sent.toString(),
       'users': [currentUser.uid, receiverId], // Add users to chat document
     }, SetOptions(merge: true));
+
+    await sendPushNotification(
+        receiverId: receiverId,
+        message: '${currentUser .displayName} sent you a message: $content',
+      );
+
 
   } catch (e) {
     logger.e('Error sending message: $e');

@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field
+// ignore_for_file: unused_field, use_build_context_synchronously
 
 import 'package:chatapp/model/message.dart';
 import 'package:chatapp/model/user.dart';
@@ -28,6 +28,8 @@ class _ChatScreenState extends State<ChatScreen> {
   late String _receiverId;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
+  final MessagingService _messagingService = MessagingService();
+  final bool _isTyping = false;
 
   @override
   void initState() {
@@ -39,10 +41,43 @@ class _ChatScreenState extends State<ChatScreen> {
     _receiverId = widget.friend.uid;
   }
 
+  Future<void> _sendMessage() async {
+    final messageText = _messageController.text.trim();
+    if (messageText.isEmpty) return;
+
+    _messageController.clear();
+    
+    try {
+      await _messagingService.sendMessage(
+        receiverId: _receiverId,
+        content: messageText,
+        status: MessageStatus.sent,
+        type: MessageType.text,
+      );
+
+      if (_scrollController.hasClients) {
+        await _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to send message: ${e.toString()}',
+            style: GoogleFonts.kavivanar(),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _onRefresh() async {
     setState(() {
       // Triggering a refresh by re-fetching the messages.
-      // You can add any logic to re-fetch data or simulate a reload here.
     });
   }
 
@@ -78,7 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _onRefresh, // Triggering refresh when the user pulls down
+        onRefresh: _onRefresh,
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -188,6 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                 ),
+                onSubmitted: (_) => _sendMessage(),
               ),
             ),
           ),
@@ -196,9 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
             backgroundColor: Colors.purple,
             child: IconButton(
               icon: const Icon(Icons.send, color: Colors.white),
-              onPressed: () {
-                // Implement send message logic
-              },
+              onPressed: _sendMessage,
             ),
           ),
         ],
@@ -219,6 +253,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return groupedMessages.entries
         .map((entry) => entry.value)
         .toList()
-      ..sort((a, b) => b.first.timestamp.compareTo(a.first.timestamp)); // Descending order
+      ..sort((a, b) => b.first.timestamp.compareTo(a.first.timestamp));
   }
 }
