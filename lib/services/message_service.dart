@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http; 
+import 'package:http/http.dart' as http;
+import 'package:onesignal_flutter/onesignal_flutter.dart'; 
 
 
 class MessagingService {
@@ -21,11 +22,29 @@ class MessagingService {
         : '${userId2}_$userId1';
   }
 
+
+Future<String?> getOneSignalPlayerId() async {
+  try {
+    String? onesignalId = await OneSignal.User.getOnesignalId();
+    return onesignalId;
+  } catch (e) {
+    print('Error retrieving OneSignal Player ID: $e');
+    return null;
+  }
+}
+
   // Method to send push notification
   Future<void> sendPushNotification({
     required String receiverId,
     required String message,
   }) async {
+
+    String? currentDevicePlayerId = await getOneSignalPlayerId();
+
+    if (currentDevicePlayerId == null) {
+      logger.e('No OneSignal device token available');
+      return;
+    }
     const url = 'https://onesignal.com/api/v1/notifications';
     
     final headers = {

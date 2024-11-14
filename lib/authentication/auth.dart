@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 class Auth {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -42,7 +43,6 @@ class Auth {
           .doc(userCredential.user!.uid)
           .get();
 
-          
 
       if (!userDoc.exists) {
         _logger.w('User document not found in Firestore for email: $email');
@@ -58,6 +58,7 @@ class Auth {
         _logger.i('User document found in Firestore for email: $email');
         _logger.i('Sign-in successful for email: $email');
       }
+      await updateOneSignalUserId();
     } on FirebaseAuthException catch (e) {
       _handleFirebaseAuthErrors(e);
       switch (e.code) {
@@ -198,6 +199,8 @@ class Auth {
 
     await _updateUserOnlineStatus(true);
 
+    await updateOneSignalUserId();
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
           builder: (context) => Home(userId: userCredential.user!.uid)),
@@ -295,7 +298,23 @@ class Auth {
 
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
+    // Reset OneSignal external user ID
+    await OneSignal.logout();
+    
   }
 
-  
+  Future<void> updateOneSignalUserId() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      // Remove previous subscription
+      await OneSignal.logout();
+      
+      // Set new external user ID
+      await OneSignal.login(currentUser.uid);
+      
+      // Prompt for notification permission if not already granted
+      await OneSignal.Notifications.requestPermission(true);
+    }
+  }
 }
+
