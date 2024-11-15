@@ -9,59 +9,51 @@ class FriendRequestService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Logger logger = Logger();
 
-  Future<FriendRequestStatus> checkFriendRequestStatus(
-      String targetUserId) async {
+  Future<FriendRequestStatus> checkFriendRequestStatus(String targetUserId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return FriendRequestStatus.none;
 
     try {
-      // Check both directions of friend requests
-      final requests = await Future.wait([
-        _firestore
-            .collection('friendRequests')
-            .where('senderId', isEqualTo: currentUserId)
-            .where('receiverId', isEqualTo: targetUserId)
-            .get(),
-        _firestore
-            .collection('friendRequests')
-            .where('senderId', isEqualTo: targetUserId)
-            .where('receiverId', isEqualTo: currentUserId)
-            .get(),
-      ]);
+      // Add error checking for targetUserId
+      if (targetUserId.isEmpty) return FriendRequestStatus.none;
+      
+      // Check both directions of friend requests with error handling
+      try {
+        final requests = await Future.wait([
+          _firestore
+              .collection('friendRequests')
+              .where('senderId', isEqualTo: currentUserId)
+              .where('receiverId', isEqualTo: targetUserId)
+              .limit(1)
+              .get(),
+          _firestore
+              .collection('friendRequests')
+              .where('senderId', isEqualTo: targetUserId)
+              .where('receiverId', isEqualTo: currentUserId)
+              .limit(1)
+              .get(),
+        ]);
 
-      for (var snapshot in requests) {
-        if (snapshot.docs.isNotEmpty) {
-          final status = snapshot.docs.first.data()['status'] as String;
-          final friendRequestStatus = status.toFriendRequestStatus();
-
-          // If the status is accepted or rejected, update related notification status
-          if (friendRequestStatus == FriendRequestStatus.accepted ||
-              friendRequestStatus == FriendRequestStatus.rejected) {
-            // Get the related notification
-            final notificationQuery = await _firestore
-                .collection('notifications')
-                .where('senderId',
-                    isEqualTo: snapshot.docs.first.data()['senderId'])
-                .where('receiverId',
-                    isEqualTo: snapshot.docs.first.data()['receiverId'])
-                .where('type', isEqualTo: 'friend_request')
-                .get();
-
-            // Update notification status to read
-            if (notificationQuery.docs.isNotEmpty) {
-              for (var notifDoc in notificationQuery.docs) {
-                await notifDoc.reference.update({'status': 'read'});
-              }
-            }
+        for (var snapshot in requests) {
+          if (snapshot.docs.isNotEmpty) {
+            final data = snapshot.docs.first.data();
+            final status = data['status'] as String;
+            return status.toFriendRequestStatus();
           }
-
-          return friendRequestStatus;
         }
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          logger.w('Permission denied while checking friend request status. This might be expected if no request exists.');
+          return FriendRequestStatus.none;
+        }
+        rethrow;
       }
+      
       return FriendRequestStatus.none;
     } catch (e) {
-      logger.e('Error checking friend request status: $e');
-      rethrow;
+      logger.e('Error checking friend request status: $e', error: e);
+      // Return none instead of rethrowing to prevent UI disruption
+      return FriendRequestStatus.none;
     }
   }
 

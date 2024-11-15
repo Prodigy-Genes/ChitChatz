@@ -34,12 +34,23 @@ class _UserTileState extends State<UserTile> {
   }
 
   Future<void> _loadFriendRequestStatus() async {
+  try {
     final status = await FriendRequestService().checkFriendRequestStatus(widget.userData['userId']);
-    setState(() {
-      _friendRequestStatus = status;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _friendRequestStatus = status;
+        _isLoading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _friendRequestStatus = FriendRequestStatus.none;
+        _isLoading = false;
+      });
+    }
   }
+}
 
   Future<void> _sendFriendRequest() async {
     final shouldAddFriend = await showDialog<bool>(
