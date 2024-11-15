@@ -19,9 +19,8 @@ class Auth {
 
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
-   Future<void> signinWithEmailAndPassword({
-    required BuildContext
-        context, 
+  Future<void> signinWithEmailAndPassword({
+    required BuildContext context,
     required String email,
     required String password,
   }) async {
@@ -35,14 +34,11 @@ class Auth {
         password: password,
       );
 
-      
-
       // Check if user data exists in Firestore
       DocumentSnapshot userDoc = await _firestore
           .collection('users')
           .doc(userCredential.user!.uid)
           .get();
-
 
       if (!userDoc.exists) {
         _logger.w('User document not found in Firestore for email: $email');
@@ -57,6 +53,14 @@ class Auth {
       } else {
         _logger.i('User document found in Firestore for email: $email');
         _logger.i('Sign-in successful for email: $email');
+
+        // Navigate to Home and remove all previous routes (no back button)
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+              builder: (context) => Home(userId: userCredential.user!.uid)),
+          (Route<dynamic> route) => false, // Remove all previous screens
+        );
       }
       await updateOneSignalUserId();
     } on FirebaseAuthException catch (e) {
@@ -111,7 +115,6 @@ class Auth {
     }
   }
 
-
   Future<UserCredential> createWithEmailAndPassword({
     required String username,
     required String email,
@@ -163,90 +166,87 @@ class Auth {
     } on Exception catch (e) {
       _logger.e('An unknown error occurred: $e');
       throw Exception('Unknown error: $e');
-
     }
 
     throw Exception('Unexpected error occurred in createWithEmailAndPassword');
   }
 
   Future<void> signInWithGoogle(BuildContext context) async {
-  try {
-    _logger.i('Attempting to sign in with Google');
+    try {
+      _logger.i('Attempting to sign in with Google');
 
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) {
-      _logger.w('Google sign-in aborted by user');
-      return;
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _logger.w('Google sign-in aborted by user');
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
+      _logger.i(
+          'Google sign-in successful for email: ${userCredential.user!.email}');
+
+      String username = googleUser.displayName ?? 'User';
+
+      // Save user to Firestore
+      await _saveUserToFirestore(userCredential.user, username);
+
+      await _updateUserOnlineStatus(true);
+
+      await updateOneSignalUserId();
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (context) => Home(userId: userCredential.user!.uid)),
+        (Route<dynamic> route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      _handleFirebaseAuthErrors(e);
+    } catch (e) {
+      _logger.e('An error occurred during Google sign-in: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('An error occurred. Please try again later.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    UserCredential userCredential =
-        await _firebaseAuth.signInWithCredential(credential);
-    _logger.i(
-        'Google sign-in successful for email: ${userCredential.user!.email}');
-
-    String username = googleUser.displayName ?? 'User';
-
-    // Save user to Firestore
-    await _saveUserToFirestore(userCredential.user, username);
-
-    await _updateUserOnlineStatus(true);
-
-    await updateOneSignalUserId();
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-          builder: (context) => Home(userId: userCredential.user!.uid)),
-      (Route<dynamic> route) => false,
-    );
-  } on FirebaseAuthException catch (e) {
-    _handleFirebaseAuthErrors(e);
-  } catch (e) {
-    _logger.e('An error occurred during Google sign-in: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('An error occurred. Please try again later.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-
   }
-}
 
   // Method to save user to Firestore
   Future<void> _saveUserToFirestore(User? user, String username) async {
-  if (user != null) {
-    final userRef = _firestore.collection('users').doc(user.uid);
-    DocumentSnapshot userDoc = await userRef.get();
+    if (user != null) {
+      final userRef = _firestore.collection('users').doc(user.uid);
+      DocumentSnapshot userDoc = await userRef.get();
 
-    if (!userDoc.exists) {
-      // If the user doesn't exist, create new data
-      final userData = {
-        'username': username,
-        'email': user.email,
-        'profilePictureUrl': user.photoURL,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-      await userRef.set(userData);
-      _logger.i('User data saved to Firestore for UID: ${user.uid}');
-    } else {
-      // Optionally update user data, but only update if necessary
-      await userRef.update({
-        'username': user.displayName,
-        // Update other fields if necessary
-      });
-      _logger.i('User data updated in Firestore for UID: ${user.uid}');
+      if (!userDoc.exists) {
+        // If the user doesn't exist, create new data
+        final userData = {
+          'username': username,
+          'email': user.email,
+          'profilePictureUrl': user.photoURL,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+        await userRef.set(userData);
+        _logger.i('User data saved to Firestore for UID: ${user.uid}');
+      } else {
+        // Optionally update user data, but only update if necessary
+        await userRef.update({
+          'username': user.displayName,
+          // Update other fields if necessary
+        });
+        _logger.i('User data updated in Firestore for UID: ${user.uid}');
+      }
     }
   }
-}
-
 
   // Update user online status
   Future<void> _updateUserOnlineStatus(bool isOnline) async {
@@ -298,9 +298,9 @@ class Auth {
 
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
+
     // Reset OneSignal external user ID
     await OneSignal.logout();
-    
   }
 
   Future<void> updateOneSignalUserId() async {
@@ -308,13 +308,12 @@ class Auth {
     if (currentUser != null) {
       // Remove previous subscription
       await OneSignal.logout();
-      
+
       // Set new external user ID
       await OneSignal.login(currentUser.uid);
-      
+
       // Prompt for notification permission if not already granted
       await OneSignal.Notifications.requestPermission(true);
     }
   }
 }
-

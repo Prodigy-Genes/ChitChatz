@@ -26,13 +26,12 @@ void initState() {
 
   // Subscribe to auth state changes
   Auth().authStateChanges.listen((User? currentUser) {
-    _setLoadingState(true); // Start loading when auth state changes
-
     if (currentUser != null) {
-      user = currentUser;
+      // If the user is already signed in, navigate to home
       _checkEmailAndUserData();
     } else {
-      print("Navigating to Signup"); // Log this line for debugging
+      // If the user is not signed in, navigate to the signup screen
+      print("Navigating to Signup");
       _navigateToSignup();
     }
   });
@@ -48,16 +47,13 @@ void initState() {
     if (refreshedUser != null) {
       bool hasValidUserData = await Auth().isUserDataValid(refreshedUser.uid);
       if (hasValidUserData) {
-        print("User has valid data, navigating to Home."); // Debug log
+        print("User has valid data, navigating to Home.");
         _navigateToHome();
-      } 
+      }
     }
   } catch (e) {
-    // Handle errors
-    print("Error in user data check: $e"); // Debug log
+    print("Error in user data check: $e");
     _navigateToSignup(); // Redirect to Signup if an error occurs
-  } finally {
-    _setLoadingState(false); // End loading regardless of outcome
   }
 }
 
@@ -82,13 +78,13 @@ void initState() {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => Home(userId:user!.uid ,)),
+        MaterialPageRoute(builder: (context) => Home(userId: user!.uid)),
       );
     }
   });
 }
 
-  void _navigateToSignup() {
+void _navigateToSignup() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -100,7 +96,6 @@ void initState() {
 }
 
 
-  // Navigate to the verification screen
   
 
   // General method to handle screen navigation
