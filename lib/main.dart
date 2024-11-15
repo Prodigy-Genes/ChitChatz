@@ -22,10 +22,10 @@ void main() async {
     // Replace with your Firebase project credentials
     await Firebase.initializeApp(
       options: FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',              
-        appId: dotenv.env['FIREBASE_APP_ID'] ?? '',                
-        messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '', 
-        projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',       
+        apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
       ),
     );
     logger.i("Firebase initialized successfully.");
@@ -33,9 +33,15 @@ void main() async {
     logger.e("Error initializing Firebase: $e");
     return;
   }
-  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-  OneSignal.initialize(dotenv.env['ONESIGNAL_APPID']??'');
-  OneSignal.Notifications.requestPermission(true);
+  try {
+    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+    OneSignal.initialize(dotenv.env['ONESIGNAL_APPID'] ?? '');
+    OneSignal.Notifications.requestPermission(true);
+    logger.i("OneSignal initialized successfully.");
+  } catch (e) {
+    logger.e("Error initializing OneSignal: $e");
+  }
+
   runApp(const ChatApp());
 }
 
@@ -69,7 +75,8 @@ class _ChatAppState extends State<ChatApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused) {
       _updateUserOnlineStatus(false); // Set offline when app goes to background
     } else if (state == AppLifecycleState.resumed) {
-      _updateUserOnlineStatus(true); // Set online when app returns to foreground
+      _updateUserOnlineStatus(
+          true); // Set online when app returns to foreground
     }
   }
 
@@ -82,7 +89,8 @@ class _ChatAppState extends State<ChatApp> with WidgetsBindingObserver {
             .collection('users')
             .doc(currentUser.uid)
             .update({'isUserOnline': isOnline});
-        _logger.i("Updated online status to $isOnline for user ${currentUser.uid}");
+        _logger.i(
+            "Updated online status to $isOnline for user ${currentUser.uid}");
       } catch (e) {
         _logger.e("Failed to update online status: $e");
       }

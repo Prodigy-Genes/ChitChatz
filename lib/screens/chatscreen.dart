@@ -3,6 +3,7 @@
 import 'package:chatapp/model/message.dart';
 import 'package:chatapp/model/user.dart';
 import 'package:chatapp/services/message_service.dart';
+import 'package:chatapp/services/messagestatushandler.dart';
 import 'package:chatapp/widgets/profile_image_widget.dart';
 import 'package:chatapp/widgets/message_bubble.dart';
 import 'package:chatapp/widgets/date_header.dart';
@@ -26,6 +27,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   late String _chatId;
   late String _receiverId;
+  late final MessageStatusHandler _statusHandler;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   final MessagingService _messagingService = MessagingService();
@@ -34,11 +36,19 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _chatId = MessagingService().generateChatId(
-      FirebaseAuth.instance.currentUser!.uid,
-      widget.friend.uid,
-    );
+    // Initialize chat ID and receiver ID first
     _receiverId = widget.friend.uid;
+    _chatId = _messagingService.generateChatId(
+      FirebaseAuth.instance.currentUser!.uid,
+      _receiverId,
+    );
+
+    // Initialize status handler
+    _statusHandler = MessageStatusHandler(messagingService: _messagingService);
+    
+    // Initialize status handling
+    _statusHandler.initializeStatusHandling(_receiverId);
+    _statusHandler.markMessagesAsRead(_chatId);
   }
 
   Future<void> _sendMessage() async {

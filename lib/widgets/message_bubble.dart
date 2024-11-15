@@ -130,29 +130,30 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
   }
 
   Widget _buildStatusIcon(MessageStatus status) {
-    IconData iconData;
-    Color iconColor = Colors.yellow.shade100; // Yellow tint for status icons
+  IconData iconData;
+  Color iconColor = Colors.yellow.shade100; // Default color
 
-    switch (status) {
-      case MessageStatus.sent:
-        iconData = Icons.check;
-        break;
-      case MessageStatus.delivered:
-        iconData = Icons.check_circle;
-        iconColor = Colors.yellow.shade200;
-        break;
-      case MessageStatus.read:
-        iconData = Icons.done_all;
-        iconColor = Colors.yellow;
-        break;
-      default:
-        iconData = Icons.check;
-    }
-
-    return Icon(
-      iconData,
-      size: 16,
-      color: iconColor,
-    );
+  switch (status) {
+    case MessageStatus.sent:
+      iconData = Icons.check;
+      break;
+    case MessageStatus.delivered:
+      iconData = Icons.check_circle;
+      iconColor = Colors.yellow.shade200;
+      break;
+    case MessageStatus.read:
+      iconData = Icons.done_all;
+      iconColor = Colors.yellow;
+      break;
+    default:
+      iconData = Icons.check;
   }
+
+  return Icon(
+    iconData,
+    size: 16,
+    color: iconColor,
+  );
+}
+
 }

@@ -1,7 +1,10 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:chatapp/model/message.dart';
 import 'package:chatapp/model/user.dart';
 import 'package:chatapp/screens/chatscreen.dart';
 import 'package:chatapp/services/message_service.dart';
+import 'package:chatapp/services/messagestatushandler.dart';
 import 'package:chatapp/widgets/profile_image_widget.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -12,19 +15,42 @@ class FriendsListItemWidgetHome extends StatelessWidget {
   final UserModel friend;
   final int unreadMessages;
   final MessagingService _messagingService = MessagingService();
+  late final MessageStatusHandler _statusHandler;
 
-   FriendsListItemWidgetHome({
-    super.key, 
-    required this.friend, 
-    required this.unreadMessages
-  });
+  FriendsListItemWidgetHome({
+    super.key,
+    required this.friend,
+    required this.unreadMessages,
+  }) {
+    _statusHandler = MessageStatusHandler(messagingService: _messagingService);
+  }
+
+  void _handleChatOpen(BuildContext context) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final chatId =
+        _messagingService.generateChatId(currentUser.uid, friend.uid);
+
+    // Mark messages as read when opening the chat
+    await _statusHandler.markMessagesAsRead(chatId);
+
+    // Navigate to chat screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(friend: friend),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return const SizedBox.shrink();
 
-    final chatId = _messagingService.generateChatId(currentUser.uid, friend.uid);
+    final chatId =
+        _messagingService.generateChatId(currentUser.uid, friend.uid);
 
     return StreamBuilder<ChatRoom?>(
       stream: _messagingService.getChatRoom(chatId),
@@ -32,13 +58,29 @@ class FriendsListItemWidgetHome extends StatelessWidget {
         // Default values if no chat room exists
         String lastMessage = 'No messages yet';
         DateTime? lastMessageTime;
-        MessageStatus? lastMessageStatus;
+        Future<MessageStatus?>? lastMessageStatusFuture;
+        String? lastMessageId;
 
         // Extract data from snapshot if available
         if (chatRoomSnapshot.hasData && chatRoomSnapshot.data != null) {
-          lastMessage = chatRoomSnapshot.data!.lastMessageContent;
-          lastMessageTime = chatRoomSnapshot.data!.lastMessageTime;
-          lastMessageStatus = chatRoomSnapshot.data!.lastMessageStatus;
+          final chatRoom = chatRoomSnapshot.data!;
+          lastMessage = chatRoom.lastMessageContent;
+          lastMessageTime = chatRoom.lastMessageTime;
+
+          // Fetch the last message id dynamically if it's not stored in ChatRoom
+          lastMessageStatusFuture = _messagingService
+              .getLastMessageId(chatRoom.chatId)
+              .then((message) {
+            if (message != null) {
+              lastMessageId =
+                  message; // Access id only if message is not null
+              return _messagingService
+                  .getMessageStatusForLastMessage(lastMessageId!);
+            } else {
+              // Handle the case where message is null
+              return Future.value(null); // Or any default value you prefer
+            }
+          });
         }
 
         return AnimatedContainer(
@@ -66,14 +108,7 @@ class FriendsListItemWidgetHome extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatScreen(friend: friend)
-                  )
-                );
-              },
+              onTap: () => _handleChatOpen(context),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -118,7 +153,8 @@ class FriendsListItemWidgetHome extends StatelessWidget {
                               ),
                               if (lastMessageTime != null)
                                 Text(
-                                  timeago.format(lastMessageTime, allowFromNow: true),
+                                  timeago.format(lastMessageTime,
+                                      allowFromNow: true),
                                   style: GoogleFonts.nunito(
                                     fontSize: 12,
                                     color: Colors.purple.shade300,
@@ -142,17 +178,28 @@ class FriendsListItemWidgetHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              if (lastMessageStatus != null)
-                                _buildMessageStatusIcon(lastMessageStatus),
+                              if (lastMessageStatusFuture != null)
+                                FutureBuilder<MessageStatus?>(
+                                  future: lastMessageStatusFuture,
+                                  builder: (context, statusSnapshot) {
+                                    if (statusSnapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    if (statusSnapshot.hasData) {
+                                      return _buildMessageStatusIcon(
+                                          statusSnapshot.data!);
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
                             ],
                           ),
                           if (unreadMessages > 0)
                             Container(
                               margin: const EdgeInsets.only(top: 8),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10, 
-                                vertical: 4
-                              ),
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.purple.shade400,
                                 borderRadius: BorderRadius.circular(12),
@@ -160,7 +207,7 @@ class FriendsListItemWidgetHome extends StatelessWidget {
                               child: Text(
                                 '$unreadMessages new',
                                 style: GoogleFonts.nunito(
-                                  color: Colors.white, 
+                                  color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
