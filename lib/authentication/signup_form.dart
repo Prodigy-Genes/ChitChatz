@@ -1,7 +1,8 @@
-// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously, avoid_print
 
+import 'package:chatapp/authentication/auth.dart';
 import 'package:flutter/material.dart';
-import 'auth_button.dart'; // Assuming this is the button file you'll create
+import 'auth_button.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -17,6 +18,7 @@ class _SignUpFormState extends State<SignUpForm> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  bool _agreedToTerms = false; // Track if checkbox is checked
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +38,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Username',
@@ -64,7 +66,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Email',
@@ -94,7 +96,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Password',
@@ -123,7 +125,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   height: 20,
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 25, // Adjust constraints for spacing
+                  minWidth: 25,
                   minHeight: 25,
                 ),
                 labelText: 'Confirm Password',
@@ -139,15 +141,53 @@ class _SignUpFormState extends State<SignUpForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 2),
 
-            // Sign Up Button
+            // Checkbox for agreeing to Terms
+            Row(
+              children: [
+                Checkbox(
+                  value: _agreedToTerms,
+                  onChanged: (value) {
+                    setState(() {
+                      _agreedToTerms = value ?? false;
+                    });
+                  },
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      // Handle navigation to Terms of Use page
+                      Navigator.pushNamed(context, '/terms');
+                    },
+                    child: const Text(
+                      'I agree to the Terms of Use',
+                      style: TextStyle(
+                        color: Colors.blueAccent, // Theme color
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+
+            // Sign Up Button (disabled until checkbox is checked)
             AuthButton(
               text: 'Sign Up',
               color: Colors.purple,
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Handle sign up logic here
+              onPressed: () async {
+                if (!_agreedToTerms) {
+                  // Show a message if the user has not agreed to the terms
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'You need to agree to the Terms of Use to proceed.'),
+                    ),
+                  );
+                } else if (_formKey.currentState!.validate()) {
+                  // Handle sign up logic
+                  _signup();
                 }
               },
             ),
@@ -155,5 +195,37 @@ class _SignUpFormState extends State<SignUpForm> {
         ),
       ),
     );
+  }
+
+  Future<void> _signup() async {
+    final auth = Auth(); // Create an instance of the Auth class
+    final email = _emailController.text;
+    final password = _passwordController.text;
+
+    try {
+      // Use the new method for creating an account
+      await auth.createWithEmailAndPassword(
+        username: _usernameController.text,
+        email: email,
+        password: password,
+        context: context, // Pass context to navigate
+      );
+
+      // If successful, show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully! Please check your email for the OTP.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Handle error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sign up failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
