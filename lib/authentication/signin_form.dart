@@ -2,7 +2,10 @@
 
 import 'package:chatapp/authentication/auth.dart';
 import 'package:chatapp/screens/home.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'auth_button.dart'; // Assuming this is the button file you'll create
 
 class SignInForm extends StatefulWidget {
@@ -17,6 +20,21 @@ class _SignInFormState extends State<SignInForm> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool isLoading = false;
+  final Logger _logger = Logger();
+
+  Future<void> _updateUserOnlineStatus(bool isOnline) async {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser != null) {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({'isUserOnline': isOnline});
+    } catch (e) {
+      _logger.e("Failed to update online status: $e");
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -99,9 +117,7 @@ class _SignInFormState extends State<SignInForm> {
             const SizedBox(height: 10),
 
             // Sign In Button
-            isLoading
-                ? const CircularProgressIndicator() // Show loading indicator
-                : AuthButton(
+                AuthButton(
                     text: 'Sign In',
                     color: Colors.purple,
                     onPressed: () {
@@ -141,6 +157,9 @@ class _SignInFormState extends State<SignInForm> {
       ),
     );
 
+    // Update user's online status to true
+    await _updateUserOnlineStatus(true);
+
     // Navigate to home after a brief delay
     await Future.delayed(const Duration(seconds: 2));
 
@@ -148,7 +167,7 @@ class _SignInFormState extends State<SignInForm> {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Home()), // Change this to your Home widget
+        MaterialPageRoute(builder: (context) => Home(userId:auth.currentUser!.uid,)), // Change this to your Home widget
       );
     }
   } catch (e) {
