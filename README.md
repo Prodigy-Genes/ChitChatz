@@ -1,6 +1,6 @@
 # ChtChatz  
 
-ChtChatz is a feature-rich real-time chat application built with Flutter and Firebase. It integrates advanced functionalities such as push notifications using OneSignal and secure email OTP authentication with EmailJS.  
+ChitChatz is a feature-rich real-time chat application built with Flutter and Firebase. It integrates advanced functionalities such as push notifications using OneSignal and secure email OTP authentication with EmailJS.  
 
 ## Features  
 - **Real-time Messaging**: Communicate instantly with Firebase-powered real-time updates.  
